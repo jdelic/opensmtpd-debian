@@ -1,6 +1,5 @@
 02_hyphen_as_minus_sign.diff
 04_no_mailq.diff
-06_man_cleanup.diff
 07_automake_missing_options.diff
 10_smtpd.conf.diff
 11_compile_warnings.diff
