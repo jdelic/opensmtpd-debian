@@ -11,9 +11,9 @@ Forwarded: not-needed
 This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 Index: opensmtpd/mk/smtpctl/Makefile.am
 ===================================================================
---- opensmtpd.orig/mk/smtpctl/Makefile.am	2013-12-23 09:58:00.056592026 -0500
-+++ opensmtpd/mk/smtpctl/Makefile.am	2013-12-23 09:58:19.469242900 -0500
-@@ -66,7 +66,6 @@
+--- opensmtpd.orig/mk/smtpctl/Makefile.am	2015-02-19 12:45:22.894326328 -0500
++++ opensmtpd/mk/smtpctl/Makefile.am	2015-02-19 12:45:22.890326216 -0500
+@@ -65,7 +65,6 @@
  install-exec-hook: $(CONFIGFILES) $(MANPAGES)
  	$(MKDIR_P) $(DESTDIR)$(mandir)/$(mansubdir)8
  	if test "$(USE_MAILWRAPPER)" = "0"; then \
@@ -21,7 +21,7 @@ Index: opensmtpd/mk/smtpctl/Makefile.am
  		ln -s $(sbindir)/smtpctl  $(DESTDIR)$(bindir)/sendmail;\
  	fi
  	$(INSTALL) -m 644 smtpctl.8.out		$(DESTDIR)$(mandir)/$(mansubdir)8/smtpctl.8
-@@ -78,6 +77,5 @@
+@@ -77,6 +76,5 @@
  	rm -f	$(DESTDIR)$(mandir)/$(mansubdir)8/sendmail.8			\
  	rmdir	$(DESTDIR)$(mandir)/$(mansubdir)8 2> /dev/null || /bin/true
  	if test "$(USE_MAILWRAPPER)" = "0"; then \
