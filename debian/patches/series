@@ -2,4 +2,3 @@
 04_no_mailq.diff
 07_automake_missing_options.diff
 10_smtpd.conf.diff
-12_ssl_check.diff
