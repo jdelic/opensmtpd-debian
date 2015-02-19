@@ -41,7 +41,7 @@
 /* Define if your snprintf is busted */
 #undef BROKEN_SNPRINTF
 
-/* FreeBSD strnvis does not do what we need */
+/* FreeBSD strnvis argument order is swapped compared to OpenBSD */
 #undef BROKEN_STRNVIS
 
 /* Define if you have BSD auth support */
@@ -61,6 +61,9 @@
 
 /* Define to 1 if you have the `arc4random_buf' function. */
 #undef HAVE_ARC4RANDOM_BUF
+
+/* Define to 1 if you have the `arc4random_stir' function. */
+#undef HAVE_ARC4RANDOM_STIR
 
 /* Define to 1 if you have the `arc4random_uniform' function. */
 #undef HAVE_ARC4RANDOM_UNIFORM
@@ -103,9 +106,6 @@
 
 /* Define to 1 if you have the `closefrom' function. */
 #undef HAVE_CLOSEFROM
-
-/* Define if gai_strerror() returns const char * */
-#undef HAVE_CONST_GAI_STRERROR_PROTO
 
 /* Define if your system uses ancillary data style file descriptor passing */
 #undef HAVE_CONTROL_IN_MSGHDR
@@ -164,6 +164,9 @@
 /* Define to 1 if you have the `endgrent' function. */
 #undef HAVE_ENDGRENT
 
+/* Define to 1 if you have the `explicit_bzero' function. */
+#undef HAVE_EXPLICIT_BZERO
+
 /* Define to 1 if you have the <fcntl.h> header file. */
 #undef HAVE_FCNTL_H
 
@@ -187,9 +190,6 @@
 
 /* Define to 1 if the system has the type `fsfilcnt_t'. */
 #undef HAVE_FSFILCNT_T
-
-/* Define to 1 if you have the `gai_strerror' function. */
-#undef HAVE_GAI_STRERROR
 
 /* Define if you want to use GCM crypto support */
 #undef HAVE_GCM_CRYPTO
@@ -230,6 +230,9 @@
 /* define if you have int64_t data type */
 #undef HAVE_INT64_T
 
+/* Define to 1 if the system has the type `intmax_t'. */
+#undef HAVE_INTMAX_T
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
@@ -256,6 +259,9 @@
 
 /* Define to 1 if you have the <libgen.h> header file. */
 #undef HAVE_LIBGEN_H
+
+/* Define to 1 if you have the `nsl' library (-lnsl). */
+#undef HAVE_LIBNSL
 
 /* Define to 1 if you have the `pam' library (-lpam). */
 #undef HAVE_LIBPAM
@@ -347,6 +353,9 @@
 
 /* Define to 1 if you have the `pw_dup' function. */
 #undef HAVE_PW_DUP
+
+/* Define to 1 if you have the `reallocarray' function. */
+#undef HAVE_REALLOCARRAY
 
 /* Define if you have experimental Redis support */
 #undef HAVE_REDIS
@@ -519,6 +528,9 @@
 /* Define to 1 if you have the `sysconf' function. */
 #undef HAVE_SYSCONF
 
+/* Define to 1 if you have the <sys/cdefs.h> header file. */
+#undef HAVE_SYS_CDEFS_H
+
 /* Define to 1 if you have the <sys/dir.h> header file. */
 #undef HAVE_SYS_DIR_H
 
@@ -566,6 +578,9 @@
 
 /* Define to 1 if you have the <ucred.h> header file. */
 #undef HAVE_UCRED_H
+
+/* Define to 1 if the system has the type `uintmax_t'. */
+#undef HAVE_UINTMAX_T
 
 /* define if you have uintxx_t data type */
 #undef HAVE_UINTXX_T
@@ -652,9 +667,6 @@
 /* compiler does not accept __attribute__ on return types */
 #undef NO_ATTRIBUTE_ON_RETURN_TYPE
 
-/* Define if you want OpenSSL's internally seeded PRNG only */
-#undef OPENSSL_PRNG_ONLY
-
 /* Name of package */
 #undef PACKAGE
 
@@ -676,18 +688,8 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
-/* Define if you are using Solaris-derived PAM which passes pam_messages to
-   the conversation function with an extra level of indirection */
-#undef PAM_SUN_CODEBASE
-
 /* Specify location of spooler */
 #undef PATH_SPOOL
-
-/* Port number of PRNGD/EGD random number socket */
-#undef PRNGD_PORT
-
-/* Location of PRNGD/EGD random number socket */
-#undef PRNGD_SOCKET
 
 /* Defined to 0 if RES_USE_DNSSEC isn't a supported resolver flag. */
 #undef RES_USE_DNSSEC
@@ -726,9 +728,6 @@
    bsd-setproctitle.c */
 #undef SPT_TYPE
 
-/* Define if pam_chauthtok wants real uid set to the unpriv'ed user */
-#undef SSHPAM_CHAUTHTOK_NEEDS_RUID
-
 /* Defined to 0 if SSL_OP_NO_TICKET isn't supported by OpenSSL. */
 #undef SSL_OP_NO_TICKET
 
@@ -743,6 +742,12 @@
 
 /* Version number of package */
 #undef VERSION
+
+/* use libcrypto for cryptography */
+#undef WITH_OPENSSL
+
+/* include SSH protocol version 1 support */
+#undef WITH_SSH1
 
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
