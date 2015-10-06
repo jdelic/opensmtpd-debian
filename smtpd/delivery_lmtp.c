@@ -19,9 +19,9 @@
 #include "includes.h"
 
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/queue.h>
 #include <sys/tree.h>
-#include <sys/socket.h>
 #include <sys/un.h>
 
 #include <ctype.h>
@@ -30,10 +30,12 @@
 #include <fcntl.h>
 #include <imsg.h>
 #include <paths.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 
 #include "smtpd.h"
 #include "log.h"
@@ -158,7 +160,7 @@ delivery_lmtp_open(struct deliver *deliver)
 	 while (!feof(fp) && !ferror(fp) && state != LMTP_BYE) {
 		 buffer = lmtp_getline(fp);
 		 if (buffer == NULL)
-			 err(1, "No input received");
+			 errx(1, "No input received");
 
 		 switch (state) {
 		 case LMTP_BANNER:

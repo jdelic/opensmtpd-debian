@@ -1,15 +1,8 @@
 #	$OpenBSD$
 
-.PATH:		${.CURDIR}/.. /usr/src/lib/libc/asr
+.PATH:		${.CURDIR}/..
 
-# detect if asr is built in libc
-TESTASR!=	nm `ls /usr/lib/libc.so.* | sort | tail -1` | grep "T asr_unpack_rr" | cut -d ' ' -f 3
-.if ${TESTASR} != "asr_unpack_rr"
-NEED_ASR=	Yes
-.endif
-
-# we're in a transitional phase, we *always* need the shipped in ASR for now
-NEED_ASR=	Yes
+OPENBSD_VERSION!=	uname -r
 
 PROG=		smtpd
 
@@ -26,16 +19,19 @@ SRCS+=		dns.c
 SRCS+=		envelope.c
 SRCS+=		esc.c
 SRCS+=		expand.c
+SRCS+=		filter.c
 SRCS+=		forward.c
 SRCS+=		iobuf.c
 SRCS+=		ioev.c
+.if ${OPENBSD_VERSION} != "5.7"
+SRCS+=		libressl.c
+.endif
 SRCS+=		limit.c
 SRCS+=		lka.c
 SRCS+=		lka_session.c
 SRCS+=		log.c
+SRCS+=		mailaddr.c
 SRCS+=		mda.c
-#SRCS+=		mfa.c
-#SRCS+=		mfa_session.c
 SRCS+=		mproc.c
 SRCS+=		mta.c
 SRCS+=		mta_session.c
@@ -52,7 +48,6 @@ SRCS+=		smtp.c
 SRCS+=		smtp_session.c
 SRCS+=		smtpd.c
 SRCS+=		ssl.c
-SRCS+=		ssl_privsep.c
 SRCS+=		ssl_smtpd.c
 SRCS+=		stat_backend.c
 SRCS+=		table.c
@@ -86,23 +81,12 @@ SRCS+=		scheduler_proc.c
 
 SRCS+=		stat_ramstat.c
 
-.ifdef NEED_ASR
-SRCS+=		asr.c
-SRCS+=		asr_debug.c
-SRCS+=		asr_utils.c
-SRCS+=		gethostnamadr_async.c
-SRCS+=		res_send_async.c
-SRCS+=		getaddrinfo_async.c
-SRCS+=		getnameinfo_async.c
-SRCS+=		res_search_async.c
-.endif
-
 MAN=		smtpd.8 smtpd.conf.5 table.5
 BINDIR=		/usr/sbin
 
 LDADD+=		-levent -lutil -lssl -lcrypto -lm -lz
 DPADD+=		${LIBEVENT} ${LIBUTIL} ${LIBSSL} ${LIBCRYPTO} ${LIBM} ${LIBZ}
-CFLAGS+=	-g3 -ggdb -I${.CURDIR}/.. -I/usr/src/lib/libc/asr
+CFLAGS+=	-g3 -ggdb -I${.CURDIR}/..
 CFLAGS+=	-Wall -Wstrict-prototypes -Wmissing-prototypes
 CFLAGS+=	-Wmissing-declarations
 CFLAGS+=	-Wshadow -Wpointer-arith -Wcast-qual
@@ -110,9 +94,13 @@ CFLAGS+=	-Wsign-compare -Wbounded
 #CFLAGS+=	-Werror # during development phase (breaks some archs)
 CFLAGS+=	-DIO_SSL
 CFLAGS+=	-DQUEUE_PROFILING
-.ifdef NEED_ASR
-CFLAGS+=	-DASR_OPT_THREADSAFE=0
-.endif
 YFLAGS=
 
+uninstall:
+	rm -f /usr/share/man/man8/smtpd.8
+	rm -f /usr/share/man/man5/smtpd.conf.5
+	rm -f /usr/share/man/man5/table.5
+	rm -f /usr/sbin/smtpd
+
 .include <bsd.prog.mk>
+

@@ -1,4 +1,4 @@
-/*	$OpenBSD: log.h,v 1.5 2014/07/08 10:30:52 eric Exp $	*/
+/*	$OpenBSD$	*/
 
 /*
  * Copyright (c) 2010 Gilles Chehade <gilles@poolp.org>

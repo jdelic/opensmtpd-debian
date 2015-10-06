@@ -1,4 +1,4 @@
-/*	$OpenBSD: scheduler_backend.c,v 1.14 2014/07/10 14:45:02 eric Exp $	*/
+/*	$OpenBSD$	*/
 
 /*
  * Copyright (c) 2012 Gilles Chehade <gilles@poolp.org>
@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include "smtpd.h"
 #include "log.h"

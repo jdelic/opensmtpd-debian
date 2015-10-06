@@ -1,4 +1,4 @@
-/*	$OpenBSD: queue.c,v 1.165 2014/07/10 15:54:55 eric Exp $	*/
+/*	$OpenBSD: queue.c,v 1.162 2014/04/19 13:40:24 gilles Exp $	*/
 
 /*
  * Copyright (c) 2008 Gilles Chehade <gilles@poolp.org>
@@ -40,6 +40,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <limits.h>
 
 #include "smtpd.h"
 #include "log.h"
@@ -50,6 +51,7 @@ static void queue_bounce(struct envelope *, struct delivery_bounce *);
 static void queue_shutdown(void);
 static void queue_sig_handler(int, short, void *);
 static void queue_log(const struct envelope *, const char *, const char *);
+static void queue_msgid_walk(int, short, void *);
 
 static size_t	flow_agent_hiwat = 10 * 1024 * 1024;
 static size_t	flow_agent_lowat =   1 * 1024 * 1024;
@@ -65,6 +67,8 @@ static void
 queue_imsg(struct mproc *p, struct imsg *imsg)
 {
 	struct delivery_bounce	 bounce;
+	struct msg_walkinfo	*wi;
+	struct timeval		 tv;
 	struct bounce_req_msg	*req_bounce;
 	struct envelope		 evp;
 	struct msg		 m;
@@ -72,7 +76,9 @@ queue_imsg(struct mproc *p, struct imsg *imsg)
 	uint64_t		 reqid, evpid, holdq;
 	uint32_t		 msgid;
 	time_t			 nexttry;
+	size_t			 n_evp;
 	int			 fd, mta_ext, ret, v, flags, code;
+	char			 buf[sizeof(evp)];
 
 	memset(&bounce, 0, sizeof(struct delivery_bounce));
 	if (p->proc == PROC_PONY) {
@@ -157,7 +163,7 @@ queue_imsg(struct mproc *p, struct imsg *imsg)
 			m_get_id(&m, &reqid);
 			m_get_envelope(&m, &evp);
 			m_end(&m);
-		    
+
 			if (evp.id == 0)
 				log_warnx("warn: imsg_queue_submit_envelope: evpid=0");
 			if (evpid_to_msgid(evp.id) == 0)
@@ -327,8 +333,11 @@ queue_imsg(struct mproc *p, struct imsg *imsg)
 				 */
 				evp.lasttry = nexttry;
 			}
+
+			(void)memcpy(buf, &evp.id, sizeof evp.id);
+			envelope_dump_buffer(&evp, buf+8, sizeof(buf)-8);
 			m_compose(p_control, IMSG_CTL_LIST_ENVELOPES,
-			    imsg->hdr.peerid, 0, -1, &evp, sizeof evp);
+			    imsg->hdr.peerid, 0, -1, buf, 8 + strlen(buf+8) + 1);
 			return;
 		}
 	}
@@ -503,10 +512,98 @@ queue_imsg(struct mproc *p, struct imsg *imsg)
 			m_end(&m);
 			profiling = v;
 			return;
+
+		case IMSG_CTL_DISCOVER_EVPID:
+			m_msg(&m, imsg);
+			m_get_evpid(&m, &evpid);
+			m_end(&m);
+			if (queue_envelope_load(evpid, &evp) == 0) {
+				log_warnx("queue: discover: failed to load "
+				    "envelope %016" PRIx64, evpid);
+				n_evp = 0;
+				m_compose(p_control, imsg->hdr.type,
+				    imsg->hdr.peerid, 0, -1,
+				    &n_evp, sizeof n_evp);
+				return;
+			}
+
+			m_create(p_scheduler, IMSG_QUEUE_DISCOVER_EVPID,
+			    0, 0, -1);
+			m_add_envelope(p_scheduler, &evp);
+			m_close(p_scheduler);
+
+			m_create(p_scheduler, IMSG_QUEUE_DISCOVER_MSGID,
+			    0, 0, -1);
+			m_add_msgid(p_scheduler, evpid_to_msgid(evpid));
+			m_close(p_scheduler);
+			n_evp = 1;
+			m_compose(p_control, imsg->hdr.type, imsg->hdr.peerid,
+			    0, -1, &n_evp, sizeof n_evp);
+			return;
+
+		case IMSG_CTL_DISCOVER_MSGID:
+			m_msg(&m, imsg);
+			m_get_msgid(&m, &msgid);
+			m_end(&m);
+			/* handle concurrent walk requests */
+			wi = xcalloc(1, sizeof *wi, "queu_imsg");
+			wi->msgid = msgid;
+			wi->peerid = imsg->hdr.peerid;
+			evtimer_set(&wi->ev, queue_msgid_walk, wi);
+			tv.tv_sec = 0;
+			tv.tv_usec = 10;
+			evtimer_add(&wi->ev, &tv);
+			return;
+
+		case IMSG_CTL_UNCORRUPT_MSGID:
+			m_msg(&m, imsg);
+			m_get_msgid(&m, &msgid);
+			m_end(&m);
+			ret = queue_message_uncorrupt(msgid);
+			m_compose(p_control, imsg->hdr.type, imsg->hdr.peerid,
+			    0, -1, &ret, sizeof ret);
+			return;
 		}
 	}
 
 	errx(1, "queue_imsg: unexpected %s imsg", imsg_to_str(imsg->hdr.type));
+}
+
+static void
+queue_msgid_walk(int fd, short event, void *arg)
+{
+	struct envelope		 evp;
+	struct timeval		 tv;
+	struct msg_walkinfo	*wi = arg;
+	int			 r;
+
+	r = queue_message_walk(&evp, wi->msgid, &wi->done, &wi->data);
+	if (r == -1) {
+		if (wi->n_evp) {
+			m_create(p_scheduler, IMSG_QUEUE_DISCOVER_MSGID,
+			    0, 0, -1);
+			m_add_msgid(p_scheduler, wi->msgid);
+			m_close(p_scheduler);
+		}
+
+		m_compose(p_control, IMSG_CTL_DISCOVER_MSGID, wi->peerid, 0, -1,
+		    &wi->n_evp, sizeof wi->n_evp);
+		evtimer_del(&wi->ev);
+		free(wi);
+		return;
+	}
+
+	if (r) {
+		m_create(p_scheduler, IMSG_QUEUE_DISCOVER_EVPID, 0, 0, -1);
+		m_add_envelope(p_scheduler, &evp);
+		m_close(p_scheduler);
+		wi->n_evp += 1;
+	}
+
+	tv.tv_sec = 0;
+	tv.tv_usec = 10;
+	evtimer_set(&wi->ev, queue_msgid_walk, wi);
+	evtimer_add(&wi->ev, &tv);
 }
 
 static void
@@ -521,6 +618,7 @@ queue_bounce(struct envelope *e, struct delivery_bounce *d)
 	b.lasttry = 0;
 	b.creation = time(NULL);
 	b.expire = 3600 * 24 * 7;
+	b.dsn_ret = e->dsn_ret;
 
 	if (e->dsn_notify & DSN_NEVER)
 		return;
@@ -697,7 +795,7 @@ queue_timeout(int fd, short event, void *p)
 static void
 queue_log(const struct envelope *e, const char *prefix, const char *status)
 {
-	char rcpt[SMTPD_MAXLINESIZE];
+	char rcpt[LINE_MAX];
 	
 	(void)strlcpy(rcpt, "-", sizeof rcpt);
 	if (strcmp(e->rcpt.user, e->dest.user) ||

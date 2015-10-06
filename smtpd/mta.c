@@ -1,4 +1,4 @@
-/*	$OpenBSD: mta.c,v 1.189 2014/07/08 13:02:42 eric Exp $	*/
+/*	$OpenBSD: mta.c,v 1.186 2014/04/19 13:32:07 gilles Exp $	*/
 
 /*
  * Copyright (c) 2008 Pierre-Yves Ritschard <pyr@openbsd.org>
@@ -34,6 +34,7 @@
 #include <inttypes.h>
 #include <netdb.h>
 #include <grp.h> /* needed for setgroups */
+#include <limits.h>
 #include <pwd.h>
 #include <signal.h>
 #include <stdio.h>
@@ -53,8 +54,8 @@
 #define DELAY_CHECK_LIMIT	5
 
 #define	DELAY_QUADRATIC		1
-#define DELAY_ROUTE_BASE	200
-#define DELAY_ROUTE_MAX		(3600 * 4)
+#define DELAY_ROUTE_BASE	15
+#define DELAY_ROUTE_MAX		3600
 
 #define RELAY_ONHOLD		0x01
 #define RELAY_HOLDQ		0x02
@@ -161,9 +162,9 @@ static time_t	max_seen_discdelay_route;
 
 #define	HOSTSTAT_EXPIRE_DELAY	(4 * 3600)
 struct hoststat {
-	char			 name[SMTPD_MAXHOSTNAMELEN];
+	char			 name[HOST_NAME_MAX+1];
 	time_t			 tm;
-	char			 error[SMTPD_MAXLINESIZE];
+	char			 error[LINE_MAX];
 	struct tree		 deferred;
 };
 static struct dict hoststat;
@@ -196,7 +197,7 @@ mta_imsg(struct mproc *p, struct imsg *imsg)
 	const char		*dom;
 	uint64_t		 reqid;
 	time_t			 t;
-	char			 buf[SMTPD_MAXLINESIZE];
+	char			 buf[LINE_MAX];
 	int			 dnserror, preference, v, status;
 	void			*iter;
 	uint64_t		 u64;
@@ -214,7 +215,7 @@ mta_imsg(struct mproc *p, struct imsg *imsg)
 			if (relay->limits && 
 			    relay->ntask >= (size_t)relay->limits->task_hiwat) {
 				if (!(relay->state & RELAY_ONHOLD)) {
-					log_info("smtp-out: hiwat reached on %s: holding envelopes",
+					log_info("smtp-out: routing: hiwat reached on %s: holding envelopes",
 					    mta_relay_to_text(relay));
 					relay->state |= RELAY_ONHOLD;
 				}
@@ -234,6 +235,7 @@ mta_imsg(struct mproc *p, struct imsg *imsg)
 				return;
 			}
 
+			task = NULL;
 			TAILQ_FOREACH(task, &relay->tasks, entry)
 				if (task->msgid == evpid_to_msgid(evp.id))
 					break;
@@ -385,11 +387,11 @@ mta_imsg(struct mproc *p, struct imsg *imsg)
 			mta_session_imsg(p, imsg);
 			return;
 
-		case IMSG_MTA_SSL_INIT:
+		case IMSG_MTA_TLS_INIT:
 			mta_session_imsg(p, imsg);
 			return;
 
-		case IMSG_MTA_SSL_VERIFY:
+		case IMSG_MTA_TLS_VERIFY:
 			mta_session_imsg(p, imsg);
 			return;
 		}
@@ -415,7 +417,7 @@ mta_imsg(struct mproc *p, struct imsg *imsg)
 
 	if (p->proc == PROC_CONTROL) {
 		switch (imsg->hdr.type) {
-			
+
 		case IMSG_CTL_RESUME_ROUTE:
 			u64 = *((uint64_t *)imsg->data);
 			if (u64)
@@ -428,7 +430,7 @@ mta_imsg(struct mproc *p, struct imsg *imsg)
 					continue;
 
 				if (route->flags & ROUTE_DISABLED) {
-					log_info("smtp-out: Enabling route %s per admin request",
+					log_info("smtp-out: routing: Enabling route %s per admin request",
 					    mta_route_to_text(route));
 					if (!runq_cancel(runq_route, NULL, route)) {
 						log_warnx("warn: route not on runq");
@@ -607,7 +609,7 @@ mta_source_error(struct mta_relay *relay, struct mta_route *route, const char *e
 	 */
 	c = mta_connector(relay, route->src);
 	if (!(c->flags & CONNECTOR_ERROR_SOURCE))
-		log_info("smtp-out: Error on %s: %s",
+		log_info("smtp-out: routing: Error on %s: %s",
 		    mta_route_to_text(route), e);
 	c->flags |= CONNECTOR_ERROR_SOURCE;
 }
@@ -619,7 +621,7 @@ mta_route_error(struct mta_relay *relay, struct mta_route *route)
 	route->nerror += 1;
 
 	if (route->nerror > MAXERROR_PER_ROUTE) {
-		log_info("smtp-out: Too many errors on %s: "
+		log_info("smtp-out: routing: Too many errors on %s: "
 		    "disabling for a while", mta_route_to_text(route));
 		mta_route_disable(route, 2, ROUTE_DISABLED_SMTP);
 	}
@@ -669,7 +671,7 @@ mta_route_collect(struct mta_relay *relay, struct mta_route *route)
 
 	/* First connection failed */
 	if (route->flags & ROUTE_NEW)
-		mta_route_disable(route, 2, ROUTE_DISABLED_NET);
+		mta_route_disable(route, 1, ROUTE_DISABLED_NET);
 
 	c = mta_connector(relay, route->src);
 	c->nconn -= 1;
@@ -691,7 +693,7 @@ mta_route_next_task(struct mta_relay *relay, struct mta_route *route)
 		/* When the number of tasks is down to lowat, query some evp */
 		if (relay->ntask == (size_t)relay->limits->task_lowat) {
 			if (relay->state & RELAY_ONHOLD) {
-				log_info("smtp-out: back to lowat on %s: releasing",
+				log_info("smtp-out: routing: back to lowat on %s: releasing",
 				    mta_relay_to_text(relay));
 				relay->state &= ~RELAY_ONHOLD;
 			}
@@ -737,7 +739,7 @@ mta_delivery_flush_event(int fd, short event, void *arg)
 			m_create(p_queue, IMSG_MTA_DELIVERY_PERMFAIL, 0, 0, -1);
 			m_add_evpid(p_queue, e->id);
 			m_add_string(p_queue, e->status);
-			m_add_int(p_queue, ESC_OTHER_STATUS);
+			m_add_int(p_queue, ESC_INVALID_RECIPIENT);
 			m_close(p_queue);
 		}
 		else if (e->delivery == IMSG_MTA_DELIVERY_LOOP) {
@@ -946,7 +948,7 @@ mta_on_mx(void *tag, void *arg, void *data)
 	}
 
 	if (domain->mxstatus)
-		log_info("smtp-out: Failed to resolve MX for %s: %s",
+		log_info("smtp-out: routing: Failed to resolve MX for %s: %s",
 		    mta_relay_to_text(relay), relay->failstr);
 
 	relay->status &= ~RELAY_WAIT_MX;
@@ -1245,7 +1247,7 @@ mta_route_disable(struct mta_route *route, int penalty, int reason)
 	delay = 60;
 #endif
 
-	log_info("smtp-out: Disabling route %s for %llus",
+	log_info("smtp-out: routing: Disabling route %s for %llus",
 	    mta_route_to_text(route), delay);
 
 	if (route->flags & ROUTE_DISABLED) {
@@ -1261,7 +1263,7 @@ static void
 mta_route_enable(struct mta_route *route)
 {
 	if (route->flags & ROUTE_DISABLED) {
-		log_info("smtp-out: Enabling route %s",
+		log_info("smtp-out: routing: Enabling route %s",
 		    mta_route_to_text(route));
 		route->flags &= ~ROUTE_DISABLED;
 		route->flags |= ROUTE_NEW;
@@ -1573,7 +1575,7 @@ mta_find_route(struct mta_connector *c, time_t now, int *limits,
 
 	/* Order is important */
 	if (seen == 0) {
-		log_info("smtp-out: No MX found for %s",
+		log_info("smtp-out: routing: No MX found for %s",
 		    mta_connector_to_text(c));
 		c->flags |= CONNECTOR_ERROR_MX;
 	}
@@ -1590,12 +1592,12 @@ mta_find_route(struct mta_connector *c, time_t now, int *limits,
 			*nextconn = tm;
 	}
 	else if (family_mismatch) {
-		log_info("smtp-out: Address family mismatch on %s",
+		log_info("smtp-out: routing: Address family mismatch on %s",
 		    mta_connector_to_text(c));
 		c->flags |= CONNECTOR_ERROR_FAMILY;
 	}
 	else if (suspended_route) {
-		log_info("smtp-out: No valid route for %s",
+		log_info("smtp-out: routing: No valid route for %s",
 		    mta_connector_to_text(c));
 		if (suspended_route & ROUTE_DISABLED_NET)
 			c->flags |= CONNECTOR_ERROR_ROUTE_NET;
@@ -1610,12 +1612,12 @@ static void
 mta_log(const struct mta_envelope *evp, const char *prefix, const char *source,
     const char *relay, const char *status)
 {
-	log_info("relay: %s for %016" PRIx64 ": session=%016"PRIx64", "
+	log_info("smtp-out: session %016"PRIx64": evpid=%016" PRIx64 ", status=%s, "
 	    "from=<%s>, to=<%s>, rcpt=<%s>, source=%s, "
 	    "relay=%s, delay=%s, stat=%s",
-	    prefix,
-	    evp->id,
 	    evp->session,
+	    evp->id,
+	    prefix,
 	    evp->task->sender,
 	    evp->dest,
 	    evp->rcpt ? evp->rcpt : "-",
@@ -1649,6 +1651,9 @@ mta_relay(struct envelope *e)
 	key.pki_name = e->agent.mta.relay.pki_name;
 	if (!key.pki_name[0])
 		key.pki_name = NULL;
+	key.ca_name = e->agent.mta.relay.ca_name;
+	if (!key.ca_name[0])
+		key.ca_name = NULL;
 	key.authtable = e->agent.mta.relay.authtable;
 	if (!key.authtable[0])
 		key.authtable = NULL;
@@ -1676,6 +1681,7 @@ mta_relay(struct envelope *e)
 		r->backuppref = -1;
 		r->port = key.port;
 		r->pki_name = key.pki_name ? xstrdup(key.pki_name, "mta: pki_name") : NULL;
+		r->ca_name = key.ca_name ? xstrdup(key.ca_name, "mta: ca_name") : NULL;
 		if (key.authtable)
 			r->authtable = xstrdup(key.authtable, "mta: authtable");
 		if (key.authlabel)
@@ -1731,6 +1737,7 @@ mta_relay_unref(struct mta_relay *relay)
 	free(relay->authtable);
 	free(relay->backupname);
 	free(relay->pki_name);
+	free(relay->ca_name);
 	free(relay->helotable);
 	free(relay->heloname);
 	free(relay->secret);
@@ -1959,6 +1966,13 @@ mta_relay_cmp(const struct mta_relay *a, const struct mta_relay *b)
 	if (a->pki_name && b->pki_name == NULL)
 		return (1);
 	if (a->pki_name && ((r = strcmp(a->pki_name, b->pki_name))))
+		return (r);
+
+	if (a->ca_name == NULL && b->ca_name)
+		return (-1);
+	if (a->ca_name && b->ca_name == NULL)
+		return (1);
+	if (a->ca_name && ((r = strcmp(a->ca_name, b->ca_name))))
 		return (r);
 
 	if (a->backupname && ((r = strcmp(a->backupname, b->backupname))))
@@ -2420,7 +2434,7 @@ void
 mta_hoststat_update(const char *host, const char *error)
 {
 	struct hoststat	*hs = NULL;
-	char		 buf[SMTPD_MAXHOSTNAMELEN];
+	char		 buf[HOST_NAME_MAX+1];
 	time_t		 tm;
 
 	if (! lowercase(buf, host, sizeof buf))
@@ -2447,7 +2461,7 @@ void
 mta_hoststat_cache(const char *host, uint64_t evpid)
 {
 	struct hoststat	*hs = NULL;
-	char buf[SMTPD_MAXHOSTNAMELEN];
+	char buf[HOST_NAME_MAX+1];
 
 	if (! lowercase(buf, host, sizeof buf))
 		return;
@@ -2466,7 +2480,7 @@ void
 mta_hoststat_uncache(const char *host, uint64_t evpid)
 {
 	struct hoststat	*hs = NULL;
-	char buf[SMTPD_MAXHOSTNAMELEN];
+	char buf[HOST_NAME_MAX+1];
 
 	if (! lowercase(buf, host, sizeof buf))
 		return;
@@ -2482,7 +2496,7 @@ void
 mta_hoststat_reschedule(const char *host)
 {
 	struct hoststat	*hs = NULL;
-	char		 buf[SMTPD_MAXHOSTNAMELEN];
+	char		 buf[HOST_NAME_MAX+1];
 	uint64_t	 evpid;
 
 	if (! lowercase(buf, host, sizeof buf))

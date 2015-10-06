@@ -1,4 +1,4 @@
-/*	$OpenBSD: mproc.c,v 1.10 2014/07/08 13:49:09 eric Exp $	*/
+/*	$OpenBSD: mproc.c,v 1.8 2014/04/19 17:45:05 gilles Exp $	*/
 
 /*
  * Copyright (c) 2012 Eric Faurot <eric@faurot.net>
@@ -34,6 +34,7 @@
 #include <imsg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -43,6 +44,7 @@
 static void mproc_dispatch(int, short, void *);
 
 static ssize_t msgbuf_write2(struct msgbuf *);
+static ssize_t imsg_read_nofd(struct imsgbuf *);
 
 int
 mproc_fork(struct mproc *p, const char *path, char *argv[])
@@ -62,6 +64,7 @@ mproc_fork(struct mproc *p, const char *path, char *argv[])
 		/* child process */
 		dup2(sp[0], STDIN_FILENO);
 		closefrom(STDERR_FILENO + 1);
+
 		execv(path, argv);
 		err(1, "execv: %s", path);
 	}
@@ -150,9 +153,16 @@ mproc_dispatch(int fd, short event, void *arg)
 
 	if (event & EV_READ) {
 
-		if ((n = imsg_read(&p->imsgbuf)) == -1) {
+		if (p->proc == PROC_CLIENT)
+			n = imsg_read_nofd(&p->imsgbuf);
+		else
+			n = imsg_read(&p->imsgbuf);
+
+		if (n == -1) {
 			log_warn("warn: %s -> %s: imsg_read",
 			    proc_name(smtpd_process),  p->name);
+			if (errno == EAGAIN)
+				return;
 			fatal("exiting");
 		}
 		if (n == 0) {
@@ -185,6 +195,14 @@ mproc_dispatch(int fd, short event, void *arg)
 
 	for (;;) {
 		if ((n = imsg_get(&p->imsgbuf, &imsg)) == -1) {
+
+			if (smtpd_process == PROC_CONTROL &&
+			    p->proc == PROC_CLIENT) {
+				log_warnx("warn: client sent invalid imsg "
+				    "over control socket");
+				p->handler(p, NULL);
+				return;
+			}
 			log_warn("fatal: %s: error in imsg_get for %s",
 			    proc_name(smtpd_process),  p->name);
 			fatalx(NULL);
@@ -274,6 +292,29 @@ again:
 	return (n);
 }
 
+/* This should go into libutil */
+static ssize_t
+imsg_read_nofd(struct imsgbuf *ibuf)
+{
+	ssize_t	 n;
+	char	*buf;
+	size_t	 len;
+
+	buf = ibuf->r.buf + ibuf->r.wpos;
+	len = sizeof(ibuf->r.buf) - ibuf->r.wpos;
+
+    again:
+	if ((n = recv(ibuf->fd, buf, len, 0)) == -1) {
+		if (errno != EINTR && errno != EAGAIN)
+			goto fail;
+		goto again;
+	}
+
+        ibuf->r.wpos += n;
+fail:
+        return (n);
+}
+
 void
 m_forward(struct mproc *p, struct imsg *imsg)
 {
@@ -281,7 +322,9 @@ m_forward(struct mproc *p, struct imsg *imsg)
 	    imsg->hdr.pid, imsg->fd, imsg->data,
 	    imsg->hdr.len - sizeof(imsg->hdr));
 
-	log_trace(TRACE_MPROC, "mproc: %s -> %s : %zu %s (forward)",
+	if (imsg->hdr.type != IMSG_STAT_DECREMENT &&
+	    imsg->hdr.type != IMSG_STAT_INCREMENT)
+		log_trace(TRACE_MPROC, "mproc: %s -> %s : %zu %s (forward)",
 		    proc_name(smtpd_process),
 		    proc_name(p->proc),
 		    imsg->hdr.len - sizeof(imsg->hdr),
@@ -301,7 +344,9 @@ m_compose(struct mproc *p, uint32_t type, uint32_t peerid, pid_t pid, int fd,
 {
 	imsg_compose(&p->imsgbuf, type, peerid, pid, fd, data, len);
 
-	log_trace(TRACE_MPROC, "mproc: %s -> %s : %zu %s",
+	if (type != IMSG_STAT_DECREMENT &&
+	    type != IMSG_STAT_INCREMENT)
+		log_trace(TRACE_MPROC, "mproc: %s -> %s : %zu %s",
 		    proc_name(smtpd_process),
 		    proc_name(p->proc),
 		    len,
@@ -333,7 +378,9 @@ m_composev(struct mproc *p, uint32_t type, uint32_t peerid, pid_t pid,
 	if (p->bytes_queued > p->bytes_queued_max)
 		p->bytes_queued_max = p->bytes_queued;
 
-	log_trace(TRACE_MPROC, "mproc: %s -> %s : %zu %s",
+	if (type != IMSG_STAT_DECREMENT &&
+	    type != IMSG_STAT_INCREMENT)
+		log_trace(TRACE_MPROC, "mproc: %s -> %s : %zu %s",
 		    proc_name(smtpd_process),
 		    proc_name(p->proc),
 		    len,
@@ -347,7 +394,7 @@ m_create(struct mproc *p, uint32_t type, uint32_t peerid, pid_t pid, int fd)
 {
 	if (p->m_buf == NULL) {
 		p->m_alloc = 128;
-		log_trace(TRACE_MPROC, "mproc: %s -> %s: allocating %zu", 
+		log_trace(TRACE_MPROC, "mproc: %s -> %s: allocating %zu",
 		    proc_name(smtpd_process),
 		    proc_name(p->proc),
 		    p->m_alloc);
@@ -673,7 +720,7 @@ m_get_string(struct msg *m, const char **s)
 	end = memchr(m->pos + 1, 0, m->end - (m->pos + 1));
 	if (end == NULL)
 		m_error("unterminated string");
-	
+
 	*s = m->pos + 1;
 	m->pos = end + 1;
 }

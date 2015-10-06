@@ -1,4 +1,4 @@
-/*	$OpenBSD: ruleset.c,v 1.30 2014/07/08 13:49:09 eric Exp $ */
+/*	$OpenBSD$ */
 
 /*
  * Copyright (c) 2009 Gilles Chehade <gilles@poolp.org>
@@ -30,6 +30,7 @@
 #include <imsg.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 
 #include "smtpd.h"
 #include "log.h"
@@ -95,13 +96,6 @@ ruleset_match(const struct envelope *evp)
 		if ((ret == 0 && !r->r_notdestination) || (ret != 0 && r->r_notdestination))
 			continue;
 
-		if (r->r_desttype == DEST_VDOM &&
-		    (r->r_action == A_RELAY || r->r_action == A_RELAYVIA)) {
-			if (! aliases_virtual_check(r->r_mapping,
-				&evp->rcpt)) {
-				return NULL;
-			}
-		}
 		goto matched;
 	}
 

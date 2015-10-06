@@ -1,4 +1,4 @@
-/*	$OpenBSD: control.c,v 1.101 2014/07/10 15:54:55 eric Exp $	*/
+/*	$OpenBSD: control.c,v 1.100 2014/04/19 11:17:14 gilles Exp $	*/
 
 /*
  * Copyright (c) 2012 Gilles Chehade <gilles@poolp.org>
@@ -40,6 +40,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <limits.h>
 
 #include "smtpd.h"
 #include "log.h"
@@ -73,11 +74,13 @@ static void control_broadcast_verbose(int, int);
 static struct stat_backend *stat_backend = NULL;
 extern const char *backend_stat;
 
-static uint32_t			connid = 0;
+static uint64_t			connid = 0;
 static struct tree		ctl_conns;
+static struct tree		ctl_count;
 static struct stat_digest	digest;
 
-#define	CONTROL_FD_RESERVE	5
+#define	CONTROL_FD_RESERVE		5
+#define	CONTROL_MAXCONN_PER_CLIENT	32
 
 static void
 control_imsg(struct mproc *p, struct imsg *imsg)
@@ -116,6 +119,9 @@ control_imsg(struct mproc *p, struct imsg *imsg)
 	if (p->proc == PROC_QUEUE) {
 		switch (imsg->hdr.type) {
 		case IMSG_CTL_LIST_ENVELOPES:
+		case IMSG_CTL_DISCOVER_EVPID:
+		case IMSG_CTL_DISCOVER_MSGID:
+		case IMSG_CTL_UNCORRUPT_MSGID:
 			c = tree_get(&ctl_conns, imsg->hdr.peerid);
 			if (c == NULL)
 				return;
@@ -281,6 +287,7 @@ control(void)
 	signal(SIGHUP, SIG_IGN);
 
 	tree_init(&ctl_conns);
+	tree_init(&ctl_count);
 
 	memset(&digest, 0, sizeof digest);
 	digest.startup = time(NULL);
@@ -306,7 +313,6 @@ static void
 control_shutdown(void)
 {
 	log_info("info: control process exiting");
-	unlink(SMTPD_SOCKET);
 	_exit(0);
 }
 
@@ -329,6 +335,9 @@ control_accept(int listenfd, short event, void *arg)
 	socklen_t		 len;
 	struct sockaddr_un	 sun;
 	struct ctl_conn		*c;
+	size_t			*count;
+	uid_t			 euid;
+	gid_t			 egid;
 
 	if (available_fds(CONTROL_FD_RESERVE))
 		goto pause;
@@ -345,10 +354,31 @@ control_accept(int listenfd, short event, void *arg)
 
 	session_socket_blockmode(connfd, BM_NONBLOCK);
 
-	c = xcalloc(1, sizeof(*c), "control_accept");
-	if (getpeereid(connfd, &c->euid, &c->egid) == -1)
+	if (getpeereid(connfd, &euid, &egid) == -1)
 		fatal("getpeereid");
-	c->id = ++connid;
+
+	count = tree_get(&ctl_count, euid);
+	if (count == NULL) {
+		count = xcalloc(1, sizeof *count, "control_accept");
+		tree_xset(&ctl_count, euid, count);
+	}
+
+	if (*count == CONTROL_MAXCONN_PER_CLIENT) {
+		close(connfd);
+		log_warnx("warn: too many connections to control socket "
+		    "from user with uid %lu", (unsigned long int)euid);
+		return;
+	}
+	(*count)++;
+
+	do {
+		++connid;
+	} while (tree_get(&ctl_conns, connid));
+
+	c = xcalloc(1, sizeof(*c), "control_accept");
+	c->euid = euid;
+	c->egid = egid;
+	c->id = connid;
 	c->mproc.proc = PROC_CLIENT;
 	c->mproc.handler = control_dispatch_ext;
 	c->mproc.data = c;
@@ -367,6 +397,14 @@ pause:
 static void
 control_close(struct ctl_conn *c)
 {
+	size_t	*count;
+
+	count = tree_xget(&ctl_count, c->euid);
+	(*count)--;
+	if (*count == 0) {
+		tree_xpop(&ctl_count, c->euid);
+		free(count);
+	}
 	tree_xpop(&ctl_conns, c->id);
 	mproc_clear(&c->mproc);
 	free(c);
@@ -436,6 +474,8 @@ control_dispatch_ext(struct mproc *p, struct imsg *imsg)
 	char			*key;
 	struct stat_value	 val;
 	size_t			 len;
+	uint64_t		 evpid;
+	uint32_t		 msgid;
 
 	c = p->data;
 
@@ -751,11 +791,38 @@ control_dispatch_ext(struct mproc *p, struct imsg *imsg)
 
 		/* table name too long */
 		len = strlen(imsg->data);
-		if (len >= SMTPD_MAXLINESIZE)
+		if (len >= LINE_MAX)
 			goto invalid;
 
 		m_forward(p_lka, imsg);
 		m_compose(p, IMSG_CTL_OK, 0, 0, -1, NULL, 0);
+		return;
+
+	case IMSG_CTL_DISCOVER_EVPID:
+		if (c->euid)
+			goto badcred;
+
+		if (imsg->hdr.len - IMSG_HEADER_SIZE != sizeof evpid)
+			goto invalid;
+
+		memmove(&evpid, imsg->data, sizeof evpid);
+		m_create(p_queue, imsg->hdr.type, c->id, 0, -1);
+		m_add_evpid(p_queue, evpid);
+		m_close(p_queue);
+		return;
+
+	case IMSG_CTL_DISCOVER_MSGID:
+	case IMSG_CTL_UNCORRUPT_MSGID:
+		if (c->euid)
+			goto badcred;
+
+		if (imsg->hdr.len - IMSG_HEADER_SIZE != sizeof msgid)
+			goto invalid;
+
+		memmove(&msgid, imsg->data, sizeof msgid);
+		m_create(p_queue, imsg->hdr.type, c->id, 0, -1);
+		m_add_msgid(p_queue, msgid);
+		m_close(p_queue);
 		return;
 
 	default:

@@ -2,16 +2,13 @@
 
 .include <bsd.own.mk>
 
-SUBDIR =	smtpd smtpctl
+SUBDIR =	smtpd
+SUBDIR+=	smtpctl
 SUBDIR+=	makemap
-#SUBDIR+=	filters
-SUBDIR+=	table-ldap
-#SUBDIR+=	table-mysql
-#SUBDIR+=	table-passwd
-#SUBDIR+=	table-postgres
-SUBDIR+=	table-sqlite
-#SUBDIR+=	table-socketmap
-#SUBDIR+=	table-stub
-#SUBDIR+=	table-redis
+
+uninstall:
+	cd smtpd && make uninstall
+	cd smtpctl && make uninstall
+	cd makemap && make uninstall
 
 .include <bsd.subdir.mk>

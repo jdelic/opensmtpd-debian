@@ -1,4 +1,4 @@
-/*	$OpenBSD: table_proc.c,v 1.3 2014/07/08 13:49:09 eric Exp $	*/
+/*	$OpenBSD$	*/
 
 /*
  * Copyright (c) 2013 Eric Faurot <eric@openbsd.org>
@@ -21,7 +21,6 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/tree.h>
-#include <sys/param.h>
 #include <sys/socket.h>
 
 #include <ctype.h>
@@ -33,6 +32,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include <unistd.h>
 
 #include "smtpd.h"

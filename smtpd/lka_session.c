@@ -1,4 +1,4 @@
-/*	$OpenBSD: lka_session.c,v 1.68 2014/07/08 13:49:09 eric Exp $	*/
+/*	$OpenBSD: lka_session.c,v 1.66 2014/04/19 12:55:23 gilles Exp $	*/
 
 /*
  * Copyright (c) 2011 Gilles Chehade <gilles@poolp.org>
@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 
 #include "smtpd.h"
 #include "log.h"
@@ -275,6 +276,7 @@ lka_expand(struct lka_session *lks, struct rule *rule, struct expandnode *xn)
 	struct mailaddr		maddr;
 	int			r;
 	union lookup		lk;
+	char		       *tag;
 
 	if (xn->depth >= EXPAND_DEPTH) {
 		log_trace(TRACE_EXPAND, "expand: lka_expand: node too deep.");
@@ -379,13 +381,19 @@ lka_expand(struct lka_session *lks, struct rule *rule, struct expandnode *xn)
 				break;
 		}
 
+		/* gilles+hackers@ -> gilles@ */
+		if ((tag = strchr(xn->u.user, TAG_CHAR)) != NULL)
+			*tag++ = '\0';
+
 		/* A username should not exceed the size of a system user */
+		/*
 		if (strlen(xn->u.user) >= sizeof fwreq.user) {
 			log_trace(TRACE_EXPAND, "expand: lka_expand: "
 			    "user-part too long to be a system user");
 			lks->error = LKA_PERMFAIL;
 			break;
 		}
+		*/
 
 		r = table_lookup(rule->r_userbase, NULL, xn->u.user, K_USERINFO, &lk);
 		if (r == -1) {
@@ -451,6 +459,27 @@ lka_expand(struct lka_session *lks, struct rule *rule, struct expandnode *xn)
 		}
 		log_trace(TRACE_EXPAND, "expand: lka_expand: filter: %s "
 		    "[depth=%d]", xn->u.buffer, xn->depth);
+		lka_submit(lks, rule, xn);
+		break;
+
+	case EXPAND_MAILDIR:
+		log_trace(TRACE_EXPAND, "expand: lka_expand: maildir: %s "
+		    "[depth=%d]", xn->u.buffer, xn->depth);
+		r = table_lookup(rule->r_userbase, NULL,
+		    xn->parent->u.user, K_USERINFO, &lk);
+		if (r == -1) {
+			log_trace(TRACE_EXPAND, "expand: lka_expand: maildir: "
+			    "backend error while searching user");
+			lks->error = LKA_TEMPFAIL;
+			break;
+		}
+		if (r == 0) {
+			log_trace(TRACE_EXPAND, "expand: lka_expand: maildir: "
+			    "user-part does not match system user");
+			lks->error = LKA_PERMFAIL;
+			break;
+		}
+
 		lka_submit(lks, rule, xn);
 		break;
 	}
@@ -529,6 +558,8 @@ lka_submit(struct lka_session *lks, struct rule *rule, struct expandnode *xn)
 		    sizeof ep->agent.mda.usertable);
 		(void)strlcpy(ep->agent.mda.username, lk.userinfo.username,
 		    sizeof ep->agent.mda.username);
+		strlcpy(ep->agent.mda.delivery_user, rule->r_delivery_user,
+		    sizeof ep->agent.mda.delivery_user);
 
 		if (xn->type == EXPAND_FILENAME) {
 			ep->agent.mda.method = A_FILENAME;
@@ -543,6 +574,11 @@ lka_submit(struct lka_session *lks, struct rule *rule, struct expandnode *xn)
 		else if (xn->type == EXPAND_USERNAME) {
 			ep->agent.mda.method = rule->r_action;
 			(void)strlcpy(ep->agent.mda.buffer, rule->r_value.buffer,
+			    sizeof ep->agent.mda.buffer);
+		}
+		else if (xn->type == EXPAND_MAILDIR) {
+			ep->agent.mda.method = A_MAILDIR;
+			(void)strlcpy(ep->agent.mda.buffer, xn->u.buffer,
 			    sizeof ep->agent.mda.buffer);
 		}
 		else
@@ -746,8 +782,10 @@ lka_expand_format(char *buf, size_t len, const struct envelope *ep,
 	char		token[MAXTOKENLEN];
 	size_t		ret, tmpret;
 
-	if (len < sizeof tmpbuf)
-		fatalx("lka_expand_format: tmp buffer < rule buffer");
+	if (len < sizeof tmpbuf) {
+		log_warnx("lka_expand_format: tmp buffer < rule buffer");
+		return 0;
+	}
 
 	memset(tmpbuf, 0, sizeof tmpbuf);
 	pbuf = buf;
@@ -801,6 +839,10 @@ lka_expand_format(char *buf, size_t len, const struct envelope *ep,
 		if (exptoklen == 0)
 			return 0;
 
+		/* writing expanded token at ptmp will overflow tmpbuf */
+		if (sizeof (tmpbuf) - (ptmp - tmpbuf) <= exptoklen)
+			return 0;
+
 		memcpy(ptmp, exptok, exptoklen);
 		pbuf   = ebuf + 1;
 		ptmp  += exptoklen;
@@ -818,13 +860,7 @@ lka_expand_format(char *buf, size_t len, const struct envelope *ep,
 static void
 mailaddr_to_username(const struct mailaddr *maddr, char *dst, size_t len)
 {
-	char	*tag;
-
 	xlowercase(dst, maddr->user, len);
-
-	/* gilles+hackers@ -> gilles@ */
-	if ((tag = strchr(dst, TAG_CHAR)) != NULL)
-		*tag++ = '\0';
 }
 
 static int 

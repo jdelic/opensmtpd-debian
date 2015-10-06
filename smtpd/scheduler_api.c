@@ -1,4 +1,4 @@
-/*	$OpenBSD: scheduler_api.c,v 1.6 2014/07/10 14:45:02 eric Exp $	*/
+/*	$OpenBSD$	*/
 
 /*
  * Copyright (c) 2013 Eric Faurot <eric@openbsd.org>
@@ -20,7 +20,11 @@
 
 #include <sys/types.h>
 #include <sys/queue.h>
-#include <sys/uio.h>
+#include <sys/tree.h>
+#include <sys/socket.h>
+
+#include <netinet/in.h>
+#include <netdb.h>
 
 #include <imsg.h>
 #include <pwd.h>

@@ -20,13 +20,16 @@
 #define nitems(_a) (sizeof((_a)) / sizeof((_a)[0]))
 #endif
 
-#define SMTPD_MAXLOCALPARTSIZE	 (255 + 1)
-#define SMTPD_MAXDOMAINPARTSIZE	 (255 + 1)
+#define	SMTPD_TABLENAME_SIZE	(64 + 1)
+#define	SMTPD_TAG_SIZE		(32 + 1)
 
-#define	SMTPD_MAXLOGNAME	32
-#define	SMTPD_MAXPATHLEN	1024
-#define	SMTPD_MAXHOSTNAMELEN	256
-#define	SMTPD_MAXLINESIZE	2048
+/* buffer sizes for email address components */
+#define SMTPD_MAXLOCALPARTSIZE	(255 + 1)
+#define SMTPD_MAXDOMAINPARTSIZE	(255 + 1)
+#define	SMTPD_MAXMAILADDRSIZE	(255 + 1)
+
+/* buffer size for virtual username (can be email addresses) */
+#define	SMTPD_VUSERNAME_SIZE	SMTPD_MAXMAILADDRSIZE
 
 #ifndef SMTPD_USER
 #define SMTPD_USER		"_smtpd"

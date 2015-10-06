@@ -1,4 +1,4 @@
-/*	$OpenBSD: table.c,v 1.17 2014/07/08 13:49:09 eric Exp $	*/
+/*	$OpenBSD: table.c,v 1.16 2014/05/09 21:30:11 tedu Exp $	*/
 
 /*
  * Copyright (c) 2013 Eric Faurot <eric@openbsd.org>
@@ -36,6 +36,8 @@
 #include <imsg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <netdb.h>
+#include <limits.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -45,7 +47,9 @@
 struct table_backend *table_backend_lookup(const char *);
 
 extern struct table_backend table_backend_static;
+#ifdef HAVE_DB_API
 extern struct table_backend table_backend_db;
+#endif
 extern struct table_backend table_backend_getpwnam;
 extern struct table_backend table_backend_proc;
 
@@ -61,8 +65,10 @@ table_backend_lookup(const char *backend)
 {
 	if (!strcmp(backend, "static") || !strcmp(backend, "file"))
 		return &table_backend_static;
+#ifdef HAVE_DB_API
 	if (!strcmp(backend, "db"))
 		return &table_backend_db;
+#endif
 	if (!strcmp(backend, "getpwnam"))
 		return &table_backend_getpwnam;
 	if (!strcmp(backend, "proc"))
@@ -75,8 +81,10 @@ table_backend_name(struct table_backend *backend)
 {
 	if (backend == &table_backend_static)
 		return "static";
+#ifdef HAVE_DB_API
 	if (backend == &table_backend_db)
 		return "db";
+#endif
 	if (backend == &table_backend_getpwnam)
 		return "getpwnam";
 	if (backend == &table_backend_proc)
@@ -97,6 +105,7 @@ table_service_name(enum table_service s)
 	case K_SOURCE:		return "SOURCE";
 	case K_MAILADDR:	return "MAILADDR";
 	case K_ADDRNAME:	return "ADDRNAME";
+	case K_MAILADDRMAP:	return "MAILADDRMAP";
 	default:		return "???";
 	}
 }
@@ -104,7 +113,7 @@ table_service_name(enum table_service s)
 struct table *
 table_find(const char *name, const char *tag)
 {
-	char buf[SMTPD_MAXLINESIZE];
+	char buf[LINE_MAX];
 
 	if (tag == NULL)
 		return dict_get(env->sc_tables_dict, name);
@@ -190,8 +199,8 @@ table_create(const char *backend, const char *name, const char *tag,
 {
 	struct table		*t;
 	struct table_backend	*tb;
-	char			 buf[SMTPD_MAXLINESIZE];
-	char			 path[SMTPD_MAXLINESIZE];
+	char			 buf[LINE_MAX];
+	char			 path[LINE_MAX];
 	size_t			 n;
 	struct stat		 sb;
 
@@ -349,6 +358,12 @@ table_update(struct table *t)
 	return (t->t_backend->update(t));
 }
 
+
+/*
+ * quick reminder:
+ * in *_match() s1 comes from session, s2 comes from table
+ */
+
 int
 table_domain_match(const char *s1, const char *s2)
 {
@@ -365,14 +380,7 @@ table_mailaddr_match(const char *s1, const char *s2)
 		return 0;
 	if (! text_to_mailaddr(&m2, s2))
 		return 0;
-
-	if (! table_domain_match(m1.domain, m2.domain))
-		return 0;
-
-	if (m2.user[0])
-		if (strcasecmp(m1.user, m2.user))
-			return 0;
-	return 1;
+	return mailaddr_match(&m1, &m2);
 }
 
 static int table_match_mask(struct sockaddr_storage *, struct netaddr *);
@@ -483,7 +491,6 @@ table_dump_all(void)
 		if (t->t_type & T_HASH) {
 			(void)strlcat(buf, sep, sizeof(buf));
 			(void)strlcat(buf, "HASH", sizeof(buf));
-			sep = ",";
 		}
 		log_debug("TABLE \"%s\" type=%s config=\"%s\"",
 		    t->t_name, buf, t->t_config);
@@ -523,7 +530,7 @@ int
 table_parse_lookup(enum table_service service, const char *key,
     const char *line, union lookup *lk)
 {
-	char	buffer[SMTPD_MAXLINESIZE], *p;
+	char	buffer[LINE_MAX], *p;
 	size_t	len;
 
 	len = strlen(line);
@@ -552,7 +559,7 @@ table_parse_lookup(enum table_service service, const char *key,
 			return (-1);
 
 		/* too big to fit in a smtp session line */
-		if (len >= SMTPD_MAXLINESIZE)
+		if (len >= LINE_MAX)
 			return (-1);
 
 		p = strchr(line, ':');
@@ -601,6 +608,17 @@ table_parse_lookup(enum table_service service, const char *key,
 			return (-1);
 		return (1);
 
+	case K_MAILADDRMAP:
+		lk->maddrmap = calloc(1, sizeof(*lk->maddrmap));
+		if (lk->maddrmap == NULL)
+			return (-1);
+		maddrmap_init(lk->maddrmap);
+		if (! mailaddr_line(lk->maddrmap, line)) {
+			maddrmap_free(lk->maddrmap);
+			return (-1);
+		}
+		return (1);
+		
 	case K_ADDRNAME:
 		if (parse_sockaddr((struct sockaddr *)&lk->addrname.addr,
 		    PF_UNSPEC, key) == -1)
@@ -618,7 +636,7 @@ table_parse_lookup(enum table_service service, const char *key,
 static const char *
 table_dump_lookup(enum table_service s, union lookup *lk)
 {
-	static char	buf[SMTPD_MAXLINESIZE];
+	static char	buf[LINE_MAX];
 	int		ret;
 
 	switch (s) {

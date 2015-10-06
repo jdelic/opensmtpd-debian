@@ -9,8 +9,6 @@ BINMODE?=555
 
 BINDIR=	/usr/libexec/smtpd
 MAN=	makemap.8 newaliases.8
-# do not override default manpages for now
-NOMAN=	noman
 
 CFLAGS+=	-g3 -ggdb -I${.CURDIR}/..
 CFLAGS+=	-Wall -Wstrict-prototypes -Wmissing-prototypes
@@ -25,6 +23,7 @@ SRCS+=		expand.c
 SRCS+=		limit.c
 SRCS+=		log.c
 SRCS+=		makemap.c
+SRCS+=		mailaddr.c
 SRCS+=		parse.y
 SRCS+=		table.c
 SRCS+=		to.c
@@ -38,4 +37,10 @@ SRCS+=		table_proc.c
 
 DPADD+= ${LIBUTIL} ${LIBCRYPTO} ${LIBZ}
 LDADD+= -lutil -lcrypto -lz
+
+uninstall:
+	rm -f /usr/share/man/man8/makemap.8
+	rm -f /usr/share/man/man8/newaliases.8
+	rm -f /usr/libexec/smtpd/makemap
+
 .include <bsd.prog.mk>

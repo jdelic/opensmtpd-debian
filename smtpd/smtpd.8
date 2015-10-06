@@ -86,30 +86,42 @@ Do not listen on SMTP sockets.
 .El
 .It Fl v
 Produce more verbose output.
+.It Fl T Ar trace
+Enables real-time tracing at startup.
+Normal operation can be resumed using 
+.Xr smtpctl 8 .
+This option can be used multiple times.
+The accepted values are:
+.Pp
+.Bl -bullet -compact
+.It
+imsg
+.It
+io
+.It
+smtp (incoming sessions)
+.It
+filters
+.It
+transfer (outgoing sessions)
+.It
+bounce
+.It
+scheduler
+.It
+expand (aliases/virtual/forward expansion)
+.It
+lookup (user/credentials lookups)
+.It
+stat
+.It
+rules (matched by incoming sessions)
+.It
+mproc
+.It
+all
 .El
-.Pp
-If you are running a BSD Operating System,
-you should use and modify 
-.Xr mailwrapper 8
-settings by editing
-.Pa /etc/mailer.conf :
-.Bd -literal -offset indent
-sendmail	/usr/sbin/smtpctl
-send-mail	/usr/sbin/smtpctl
-mailq		/usr/sbin/smtpctl
-makemap		/usr/libexec/smtpd/makemap
-newaliases	/usr/libexec/smtpd/makemap
-.Ed
-.Pp
-Disable the sendmail clientmqueue entry in
-.Xr crontab 1 .
-.Pp
-Rebuild the aliases database,
-and enable the daemon:
-.Bd -literal -offset indent
-# newaliases
-# /etc/rc.d/smtpd start
-.Ed
+.El
 .Sh FILES
 .Bl -tag -width "/var/run/smtpd.sockXXX" -compact
 .It Pa /etc/mail/mailname

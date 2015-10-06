@@ -3,13 +3,6 @@
 /* Define if building universal (internal helper macro) */
 #undef AC_APPLE_UNIVERSAL_BUILD
 
-/* Define if you have a getaddrinfo that fails for the all-zeros IPv6 address
-   */
-#undef AIX_GETNAMEINFO_HACK
-
-/* Define if your resolver libs need this for getrrsetbyname */
-#undef BIND_8_COMPAT
-
 /* Define if cmsg_type is not passed correctly */
 #undef BROKEN_CMSG_TYPE
 
@@ -122,6 +115,9 @@
 /* if you have the <db_185.h> header file */
 #undef HAVE_DB_185_H
 
+/* Define to 1 if HAVE_DB_API */
+#undef HAVE_DB_API
+
 /* if you have the <db.h> header file */
 #undef HAVE_DB_H
 
@@ -166,6 +162,9 @@
 
 /* Define to 1 if you have the `explicit_bzero' function. */
 #undef HAVE_EXPLICIT_BZERO
+
+/* Define to 1 if you have the `fchflags' function. */
+#undef HAVE_FCHFLAGS
 
 /* Define to 1 if you have the <fcntl.h> header file. */
 #undef HAVE_FCNTL_H
@@ -248,8 +247,8 @@
 /* Define to 1 if you have the `isblank' function. */
 #undef HAVE_ISBLANK
 
-/* Define if you have experimental LDAP support */
-#undef HAVE_LDAP
+/* Define to 1 if you have the `asr' library (-lasr). */
+#undef HAVE_LIBASR
 
 /* Define to 1 if you have the `crypt' library (-lcrypt). */
 #undef HAVE_LIBCRYPT
@@ -268,9 +267,6 @@
 
 /* Define to 1 if you have the `socket' library (-lsocket). */
 #undef HAVE_LIBSOCKET
-
-/* Define to 1 if you have the `sqlite3' library (-lsqlite3). */
-#undef HAVE_LIBSQLITE3
 
 /* Define to 1 if you have the <libutil.h> header file. */
 #undef HAVE_LIBUTIL_H
@@ -304,12 +300,6 @@
 
 /* define if you have mode_t data type */
 #undef HAVE_MODE_T
-
-/* Define if you have experimental MySQL support */
-#undef HAVE_MYSQL
-
-/* Some systems put nanosleep outside of libc */
-#undef HAVE_NANOSLEEP
 
 /* Define to 1 if you have the <ndir.h> header file. */
 #undef HAVE_NDIR_H
@@ -345,9 +335,6 @@
 /* define if you have pid_t data type */
 #undef HAVE_PID_T
 
-/* Define if you have experimental PostgreSQL support */
-#undef HAVE_POSTGRES
-
 /* Define if you have /proc/$pid/fd */
 #undef HAVE_PROC_PID
 
@@ -356,9 +343,6 @@
 
 /* Define to 1 if you have the `reallocarray' function. */
 #undef HAVE_REALLOCARRAY
-
-/* Define if you have experimental Redis support */
-#undef HAVE_REDIS
 
 /* define if you have sa_family_t data type */
 #undef HAVE_SA_FAMILY_T
@@ -405,20 +389,11 @@
 /* define if you have size_t data type */
 #undef HAVE_SIZE_T
 
-/* Define if you have experimental socketmap support */
-#undef HAVE_SOCKETMAP
-
 /* Define to 1 if you have the `socketpair' function. */
 #undef HAVE_SOCKETPAIR
 
 /* Have PEERCRED socket option */
 #undef HAVE_SO_PEERCRED
-
-/* Define if you have experimental SQLite support */
-#undef HAVE_SQLITE
-
-/* if you have the <sqlite3.h> header file */
-#undef HAVE_SQLITE3_H
 
 /* define if you have ssize_t data type */
 #undef HAVE_SSIZE_T
@@ -648,9 +623,6 @@
 /* Define if compiler implements __func__ */
 #undef HAVE___func__
 
-/* Define libevent major version */
-#undef LIBEVENT_MAJOR_VERSION
-
 /* max value of long long calculated by configure */
 #undef LLONG_MAX
 
@@ -663,6 +635,9 @@
 
 /* Set this to your mail directory if you do not have _PATH_MAILDIR */
 #undef MAIL_DIRECTORY
+
+/* OpenBSD doesn't need ASR_FREEADDRINFO */
+#undef NOOP_ASR_FREEADDRINFO
 
 /* compiler does not accept __attribute__ on return types */
 #undef NO_ATTRIBUTE_ON_RETURN_TYPE
@@ -728,7 +703,7 @@
    bsd-setproctitle.c */
 #undef SPT_TYPE
 
-/* Defined to 0 if SSL_OP_NO_TICKET isn't supported by OpenSSL. */
+/* Defined to 0 if SSL_OP_NO_TICKET isn't supported by LibreSSL. */
 #undef SSL_OP_NO_TICKET
 
 /* Define to 1 if you have the ANSI C header files. */
@@ -745,9 +720,6 @@
 
 /* use libcrypto for cryptography */
 #undef WITH_OPENSSL
-
-/* include SSH protocol version 1 support */
-#undef WITH_SSH1
 
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */

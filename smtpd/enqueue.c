@@ -1,4 +1,4 @@
-/*	$OpenBSD: enqueue.c,v 1.88 2014/11/12 10:28:07 gilles Exp $	*/
+/*	$OpenBSD: enqueue.c,v 1.81 2014/06/06 15:02:08 gilles Exp $	*/
 
 /*
  * Copyright (c) 2005 Henning Brauer <henning@bulabula.org>
@@ -40,6 +40,7 @@
 #include <sysexits.h>
 #include <time.h>
 #include <unistd.h>
+#include <limits.h>
 
 #include "smtpd.h"
 
@@ -53,10 +54,9 @@ static void parse_addr_terminal(int);
 static char *qualify_addr(char *);
 static void rcpt_add(char *);
 static int open_connection(void);
-static int get_responses(FILE *, int);
+static void get_responses(FILE *, int);
 static int send_line(FILE *, int, char *, ...);
 static int enqueue_offline(int, char *[], FILE *);
-static int savedeadletter(struct passwd *, FILE *);
 
 extern int srv_connect(void);
 
@@ -101,7 +101,7 @@ struct {
 #define WSP(c)			(c == ' ' || c == '\t')
 
 int	  verbose = 0;
-char	  host[SMTPD_MAXHOSTNAMELEN];
+char	  host[HOST_NAME_MAX+1];
 char	 *user = NULL;
 time_t	  timestamp;
 
@@ -123,7 +123,6 @@ struct {
 	int	  saw_content_disposition;
 	int	  saw_content_transfer_encoding;
 	int	  saw_user_agent;
-	int	  noheader;
 } msg;
 
 struct {
@@ -166,7 +165,7 @@ qp_encoded_write(FILE *fp, char *buf, size_t len)
 int
 enqueue(int argc, char *argv[])
 {
-	int			 i, ch, tflag = 0;
+	int			 i, ch, tflag = 0, noheader;
 	char			*fake_from = NULL, *buf;
 	struct passwd		*pw;
 	FILE			*fp, *fout;
@@ -178,6 +177,7 @@ enqueue(int argc, char *argv[])
 	int			 inheaders = 0;
 	int			 save_argc;
 	char			**save_argv;
+	int			 no_getlogin = 0;
 
 	memset(&msg, 0, sizeof(msg));
 	time(&timestamp);
@@ -186,7 +186,7 @@ enqueue(int argc, char *argv[])
 	save_argv = argv;
 
 	while ((ch = getopt(argc, argv,
-	    "A:B:b:E::e:F:f:iJ::L:mN:o:p:qR:tvV:x")) != -1) {
+	    "A:B:b:E::e:F:f:iJ::L:mN:o:p:qR:StvV:x")) != -1) {
 		switch (ch) {
 		case 'f':
 			fake_from = optarg;
@@ -199,6 +199,9 @@ enqueue(int argc, char *argv[])
 			break;
 		case 'R':
 			msg.dsn_ret = optarg;
+			break;
+		case 'S':
+			no_getlogin = 1;
 			break;
 		case 't':
 			tflag = 1;
@@ -235,11 +238,24 @@ enqueue(int argc, char *argv[])
 
 	if (getmailname(host, sizeof(host)) == -1)
 		err(EX_NOHOST, "getmailname");
-	if ((user = getlogin()) != NULL && *user != '\0')
-		pw = getpwnam(user);
-	else if ((pw = getpwuid(getuid())) == NULL)
-		user = "anonymous";
-	user = xstrdup(pw ? pw->pw_name : user, "enqueue");
+	if (no_getlogin) {
+		if ((pw = getpwuid(getuid())) == NULL)
+			user = "anonymous";
+		if (pw != NULL)
+			user = xstrdup(pw->pw_name, "enqueue");
+	}
+	else {
+		uid_t ruid = getuid();
+
+		if ((user = getlogin()) != NULL && *user != '\0') {
+			if ((pw = getpwnam(user)) == NULL ||
+			    (ruid != 0 && ruid != pw->pw_uid))
+				pw = getpwuid(ruid);
+		} else if ((pw = getpwuid(ruid)) == NULL) {
+			user = "anonymous";
+		}
+		user = xstrdup(pw ? pw->pw_name : user, "enqueue");
+	}
 
 	build_from(fake_from, pw);
 
@@ -259,7 +275,7 @@ enqueue(int argc, char *argv[])
 		errc(EX_UNAVAILABLE, saved_errno, "mkstemp");
 	}
 	unlink(sfn);
-	msg.noheader = parse_message(stdin, fake_from == NULL, tflag, fp);
+	noheader = parse_message(stdin, fake_from == NULL, tflag, fp);
 
 	if (msg.rcpt_cnt == 0)
 		errx(EX_SOFTWARE, "no recipients");
@@ -286,12 +302,10 @@ enqueue(int argc, char *argv[])
 	 */
 
 	/* banner */
-	if (! get_responses(fout, 1))
-		goto fail;
+	get_responses(fout, 1);
 
 	send_line(fout, verbose, "EHLO localhost\n");
-	if (! get_responses(fout, 1))
-		goto fail;
+	get_responses(fout, 1);
 
 	if (msg.dsn_envid != NULL)
 		envid_sz = strlen(msg.dsn_envid);
@@ -302,21 +316,18 @@ enqueue(int argc, char *argv[])
 	    msg.dsn_ret ? msg.dsn_ret : "",
 	    envid_sz ? "ENVID=" : "",
 	    envid_sz ? msg.dsn_envid : "");
-	if (! get_responses(fout, 1))
-		goto fail;
+	get_responses(fout, 1);
 
 	for (i = 0; i < msg.rcpt_cnt; i++) {
 		send_line(fout, verbose, "RCPT TO:<%s> %s%s\n",
 		    msg.rcpts[i],
 		    msg.dsn_notify ? "NOTIFY=" : "",
 		    msg.dsn_notify ? msg.dsn_notify : "");
-		if (! get_responses(fout, 1))
-			goto fail;
+		get_responses(fout, 1);
 	}
 
 	send_line(fout, verbose, "DATA\n");
-	if (! get_responses(fout, 1))
-		goto fail;
+	get_responses(fout, 1);
 
 	/* add From */
 	if (!msg.saw_from)
@@ -349,7 +360,7 @@ enqueue(int argc, char *argv[])
 	}
 
 	/* add separating newline */
-	if (msg.noheader)
+	if (noheader)
 		send_line(fout, 0, "\n");
 	else
 		inheaders = 1;
@@ -360,6 +371,9 @@ enqueue(int argc, char *argv[])
 			err(EX_UNAVAILABLE, "fgetln");
 		if (buf == NULL && feof(fp))
 			break;
+		if (buf == NULL)
+			err(EX_UNAVAILABLE, "fgetln");
+
 		/* newlines have been normalized on first parsing */
 		if (buf[len-1] != '\n')
 			errx(EX_SOFTWARE, "expect EOL");
@@ -372,7 +386,14 @@ enqueue(int argc, char *argv[])
 
 		line = buf;
 
-		if (msg.saw_content_transfer_encoding || msg.noheader ||
+		if (inheaders) {
+			if (strncasecmp("From ", line, 5) == 0)
+				continue;
+			if (strncasecmp("Return-Path: ", line, 13) == 0)
+				continue;
+		}
+
+		if (msg.saw_content_transfer_encoding || noheader ||
 		    inheaders || !msg.need_linesplit) {
 			send_line(fout, 0, "%.*s", (int)len, line);
 			if (inheaders && buf[0] == '\n')
@@ -396,25 +417,18 @@ enqueue(int argc, char *argv[])
 		} while (len);
 	}
 	send_line(fout, verbose, ".\n");
-	if (! get_responses(fout, 1))
-		goto fail;
+	get_responses(fout, 1);
 
 	send_line(fout, verbose, "QUIT\n");
-	if (! get_responses(fout, 1))
-		goto fail;
+	get_responses(fout, 1);
 
 	fclose(fp);
 	fclose(fout);
 
 	exit(EX_OK);
-
-fail:
-	if (pw)
-		savedeadletter(pw, fp);
-	exit(EX_SOFTWARE);
 }
 
-static int
+static void
 get_responses(FILE *fin, int n)
 {
 	char	*buf;
@@ -422,45 +436,34 @@ get_responses(FILE *fin, int n)
 	int	 e;
 
 	fflush(fin);
-	if ((e = ferror(fin))) {
-		warnx("ferror: %d", e);
-		return 0;
-	}
+	if ((e = ferror(fin)))
+		errx(1, "ferror: %d", e);
 
 	while (n) {
 		buf = fgetln(fin, &len);
-		if (buf == NULL && ferror(fin)) {
-			warn("fgetln");
-			return 0;
-		}
+		if (buf == NULL && ferror(fin))
+			err(1, "fgetln");
 		if (buf == NULL && feof(fin))
 			break;
-		if (buf == NULL || len < 1) {
-			warn("fgetln weird");
-			return 0;
-		}
+		if (buf == NULL || len < 1)
+			err(1, "fgetln weird");
 
 		/* account for \r\n linebreaks */
 		if (len >= 2 && buf[len - 2] == '\r' && buf[len - 1] == '\n')
 			buf[--len - 1] = '\n';
 
-		if (len < 4) {
-			warnx("bad response");
-			return 0;
-		}
+		if (len < 4)
+			errx(1, "bad response");
 
 		if (verbose)
 			printf("<<< %.*s", (int)len, buf);
 
 		if (buf[3] == '-')
 			continue;
-		if (buf[0] != '2' && buf[0] != '3') {
-			warnx("command failed: %.*s", (int)len, buf);
-			return 0;
-		}
+		if (buf[0] != '2' && buf[0] != '3')
+			errx(1, "command failed: %.*s", (int)len, buf);
 		n--;
 	}
-	return 1;
 }
 
 static int
@@ -728,8 +731,8 @@ rcpt_add(char *addr)
 		p++;
 	}
 
-	if ((nrcpts = reallocarray(msg.rcpts,
-	    msg.rcpt_cnt + n, sizeof(char *))) == NULL)
+	if ((nrcpts = realloc(msg.rcpts,
+	    sizeof(char *) * (msg.rcpt_cnt + n))) == NULL)
 		err(1, "rcpt_add realloc");
 	msg.rcpts = nrcpts;
 
@@ -788,16 +791,29 @@ open_connection(void)
 static int
 enqueue_offline(int argc, char *argv[], FILE *ifile)
 {
-	char	 path[SMTPD_MAXPATHLEN];
+	char	 path[PATH_MAX];
 	FILE	*fp;
 	int	 i, fd, ch;
 	mode_t	 omode;
+	uint64_t	rnd;
+	int	 ret;
 
 	if (ckdir(PATH_SPOOL PATH_OFFLINE, 01777, 0, 0, 0) == 0)
 		errx(EX_UNAVAILABLE, "error in offline directory setup");
 
-	if (! bsnprintf(path, sizeof(path), "%s%s/%lld.XXXXXXXXXX", PATH_SPOOL,
-		PATH_OFFLINE, (long long int) time(NULL)))
+	do {
+		rnd = generate_uid();
+		if (! bsnprintf(path, sizeof(path), "%s%s/%016"PRIx64, PATH_SPOOL,
+			PATH_OFFLINE, rnd))
+			err(EX_UNAVAILABLE, "snprintf");
+		ret = mkdir(path, 0700);
+		if (ret == -1)
+			if (errno != EEXIST)
+				err(EX_UNAVAILABLE, "mkdir");
+	} while (ret == -1);
+
+	if (! bsnprintf(path, sizeof(path), "%s%s/%016"PRIx64"/%lld.XXXXXXXXXX", PATH_SPOOL,
+		PATH_OFFLINE, rnd, (long long int) time(NULL)))
 		err(EX_UNAVAILABLE, "snprintf");
 
 	omode = umask(7077);
@@ -841,77 +857,4 @@ enqueue_offline(int argc, char *argv[], FILE *ifile)
 	fclose(fp);
 
 	return (EX_TEMPFAIL);
-}
-
-static int
-savedeadletter(struct passwd *pw, FILE *in)
-{
-	char	buffer[SMTPD_MAXPATHLEN];
-	FILE   *fp;
-	char *buf, *lbuf;
-	size_t len;
-
-	(void)snprintf(buffer, sizeof buffer, "%s/dead.letter", pw->pw_dir);
-
-	if (fseek(in, 0, SEEK_SET) != 0)
-		return 0;
-	
-	if ((fp = fopen(buffer, "w")) == NULL)
-		return 0;
-
-	/* add From */
-	if (!msg.saw_from)
-		fprintf(fp, "From: %s%s<%s>\n",
-		    msg.fromname ? msg.fromname : "",
-		    msg.fromname ? " " : "",
-		    msg.from);
-
-	/* add Date */
-	if (!msg.saw_date)
-		fprintf(fp, "Date: %s\n", time_to_text(timestamp));
-
-	/* add Message-Id */
-	if (!msg.saw_msgid)
-		fprintf(fp, "Message-Id: <%"PRIu64".enqueue@%s>\n",
-		    generate_uid(), host);
-
-	if (msg.need_linesplit) {
-		/* we will always need to mime encode for long lines */
-		if (!msg.saw_mime_version)
-			fprintf(fp, "MIME-Version: 1.0\n");
-		if (!msg.saw_content_type)
-			fprintf(fp, "Content-Type: text/plain; "
-			    "charset=unknown-8bit\n");
-		if (!msg.saw_content_disposition)
-			fprintf(fp, "Content-Disposition: inline\n");
-		if (!msg.saw_content_transfer_encoding)
-			fprintf(fp, "Content-Transfer-Encoding: "
-			    "quoted-printable\n");
-	}
-
-	/* add separating newline */
-	if (msg.noheader)
-		fprintf(fp, "\n");
-
-
-	lbuf = NULL;
-	while ((buf = fgetln(in, &len))) {
-		if (buf[len - 1] == '\n')
-			buf[len - 1] = '\0';
-		else {
-			/* EOF without EOL, copy and add the NUL */
-			if ((lbuf = malloc(len + 1)) == NULL)
-				err(1, NULL);
-			memcpy(lbuf, buf, len);
-			lbuf[len] = '\0';
-			buf = lbuf;
-		}
-		fprintf(fp, "%s\n", buf);
-	}
-	free(lbuf);
-
-	fprintf(fp, "\n");
-	fclose(fp);
-
-	return 1;
 }

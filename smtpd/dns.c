@@ -39,9 +39,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include "smtpd.h"
 #include "log.h"
+
+/* On OpenBSD, this function is not needed because we don't free addrinfo */
+#if defined(NOOP_ASR_FREEADDRINFO)
+#define asr_freeaddrinfo(x) (x)
+#endif
 
 struct dns_lookup {
 	struct dns_session	*session;
@@ -52,7 +58,7 @@ struct dns_session {
 	struct mproc		*p;
 	uint64_t		 reqid;
 	int			 type;
-	char			 name[SMTPD_MAXHOSTNAMELEN];
+	char			 name[HOST_NAME_MAX+1];
 	size_t			 mxfound;
 	int			 error;
 	int			 refcount;
@@ -248,7 +254,7 @@ dns_imsg(struct mproc *p, struct imsg *imsg)
 		}
 
 		as = res_query_async(s->name, C_IN, T_MX, NULL);
-		if (as ==  NULL) {
+		if (as == NULL) {
 			log_warn("warn: req_query_async: %s", s->name);
 			m_create(s->p, IMSG_MTA_DNS_HOST_END, 0, 0, -1);
 			m_add_id(s->p, s->reqid);
@@ -266,9 +272,6 @@ dns_imsg(struct mproc *p, struct imsg *imsg)
 		m_get_string(&m, &mx);
 		m_end(&m);
 		(void)strlcpy(s->name, mx, sizeof(s->name));
-
-		sa = (struct sockaddr *)&ss;
-		sl = sizeof(ss);
 
 		as = res_query_async(domain, C_IN, T_MX, NULL);
 		if (as == NULL) {
@@ -345,7 +348,7 @@ dns_dispatch_mx(struct asr_result *ar, void *arg)
 	struct unpack		 pack;
 	struct dns_header	 h;
 	struct dns_query	 q;
-	struct dns_rr	 rr;
+	struct dns_rr		 rr;
 	char			 buf[512];
 	size_t			 found;
 
@@ -365,13 +368,15 @@ dns_dispatch_mx(struct asr_result *ar, void *arg)
 		return;
 	}
 
-	unpack_init(&pack, ar->ar_data, ar->ar_datalen);
-	unpack_header(&pack, &h);
-	unpack_query(&pack, &q);
-
 	found = 0;
+
+	unpack_init(&pack, ar->ar_data, ar->ar_datalen);
+	if (unpack_header(&pack, &h) == -1 || unpack_query(&pack, &q) == -1)
+		return;
+
 	for (; h.ancount; h.ancount--) {
-		unpack_rr(&pack, &rr);
+		if (unpack_rr(&pack, &rr) == -1)
+			break;
 		if (rr.rr_type != T_MX)
 			continue;
 		print_dname(rr.rr.mx.exchange, buf, sizeof(buf));
@@ -409,17 +414,19 @@ dns_dispatch_mx_preference(struct asr_result *ar, void *arg)
 	else {
 		error = DNS_ENOTFOUND;
 		unpack_init(&pack, ar->ar_data, ar->ar_datalen);
-		unpack_header(&pack, &h);
-		unpack_query(&pack, &q);
-		for (; h.ancount; h.ancount--) {
-			unpack_rr(&pack, &rr);
-			if (rr.rr_type != T_MX)
-				continue;
-			print_dname(rr.rr.mx.exchange, buf, sizeof(buf));
-			buf[strlen(buf) - 1] = '\0';
-			if (!strcasecmp(s->name, buf)) {
-				error = DNS_OK;
-				break;
+		if (unpack_header(&pack, &h) != -1 &&
+		    unpack_query(&pack, &q) != -1) {
+			for (; h.ancount; h.ancount--) {
+				if (unpack_rr(&pack, &rr) == -1)
+					break;
+				if (rr.rr_type != T_MX)
+					continue;
+				print_dname(rr.rr.mx.exchange, buf, sizeof(buf));
+				buf[strlen(buf) - 1] = '\0';
+				if (!strcasecmp(s->name, buf)) {
+					error = DNS_OK;
+					break;
+				}
 			}
 		}
 	}
@@ -440,6 +447,8 @@ dns_lookup_host(struct dns_session *s, const char *host, int preference)
 {
 	struct dns_lookup	*lookup;
 	struct addrinfo		 hints;
+	char			 hostcopy[HOST_NAME_MAX+1];
+	char			*p;
 	void			*as;
 
 	lookup = xcalloc(1, sizeof *lookup, "dns_lookup_host");
@@ -447,8 +456,19 @@ dns_lookup_host(struct dns_session *s, const char *host, int preference)
 	lookup->session = s;
 	s->refcount++;
 
+	if (*host == '[') {
+		if (strncasecmp("[IPv6:", host, 6) == 0)
+			host += 6;
+		else
+			host += 1;
+		(void)strlcpy(hostcopy, host, sizeof hostcopy);
+		p = strchr(hostcopy, ']');
+		if (p)
+			*p = 0;
+		host = hostcopy;
+	}
+
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_flags = AI_ADDRCONFIG;
 	hints.ai_family = PF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	as = getaddrinfo_async(host, NULL, &hints, NULL);

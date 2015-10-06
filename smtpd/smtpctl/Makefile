@@ -34,4 +34,9 @@ SRCS+=		dict.c
 
 LDADD+=	-lutil -lz -lcrypto
 DPADD+=	${LIBUTIL} ${LIBZ} ${LIBCRYPTO}
+
+uninstall:
+	rm -f /usr/share/man/man8/smtpctl.8
+	rm -f /usr/sbin/smtpctl
+
 .include <bsd.prog.mk>

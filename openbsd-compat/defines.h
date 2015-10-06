@@ -42,6 +42,12 @@ enum
 # define SHUT_RDWR SHUT_RDWR
 #endif
 
+#ifndef HOST_NAME_MAX
+# ifdef _POSIX_HOST_NAME_MAX
+# define HOST_NAME_MAX _POSIX_HOST_NAME_MAX
+# endif
+#endif
+
 #ifndef PATH_MAX
 # ifdef _POSIX_PATH_MAX
 # define PATH_MAX _POSIX_PATH_MAX
@@ -60,20 +66,6 @@ enum
 #  endif /* BROKEN_REALPATH */
 # endif /* PATH_MAX */
 #endif /* MAXPATHLEN */
-
-/*
- * Looks like ugly, but MAX_IMSGSIZE equals 16384,
- * and if we don't care it will overflow for some struct
- */
-#if PATH_MAX > 1024
-#  undef  PATH_MAX
-#  define PATH_MAX 1024
-#endif
-
-#if MAXPATHLEN > 1024
-#  undef  MAXPATHLEN
-#  define MAXPATHLEN 1024
-#endif
 
 #ifndef MAXHOSTNAMELEN
 # define MAXHOSTNAMELEN  64
@@ -853,5 +845,16 @@ struct winsize {
 #define CLOCK_MONOTONIC -1
 #endif
 /* end of chl */
+
+#ifndef HAVE_FPARSELN
+/*
+ * fparseln() specific operation flags.
+ */
+#define FPARSELN_UNESCESC       0x01
+#define FPARSELN_UNESCCONT      0x02
+#define FPARSELN_UNESCCOMM      0x04
+#define FPARSELN_UNESCREST      0x08
+#define FPARSELN_UNESCALL       0x0f
+#endif
 
 #endif /* _DEFINES_H */

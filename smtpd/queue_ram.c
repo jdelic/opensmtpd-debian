@@ -1,4 +1,4 @@
-/*	$OpenBSD: queue_ram.c,v 1.6 2014/07/08 15:45:32 eric Exp $	*/
+/*	$OpenBSD$	*/
 
 /*
  * Copyright (c) 2012 Eric Faurot <eric@openbsd.org>
@@ -38,6 +38,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <limits.h>
 
 #include "smtpd.h"
 #include "log.h"

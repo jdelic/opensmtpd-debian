@@ -1,4 +1,4 @@
-/*	$OpenBSD: makemap.c,v 1.50 2014/10/25 18:48:30 gilles Exp $	*/
+/*	$OpenBSD$	*/
 
 /*
  * Copyright (c) 2008 Gilles Chehade <gilles@poolp.org>
@@ -45,6 +45,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 #ifdef HAVE_UTIL_H
 #include <util.h>
 #endif
@@ -106,7 +107,7 @@ int
 main(int argc, char *argv[])
 {
 	struct stat	 sb;
-	char		 dbname[SMTPD_MAXPATHLEN];
+	char		 dbname[PATH_MAX];
 	char		*opts;
 	char		*conf;
 	int		 ch;
@@ -259,7 +260,6 @@ parse_map(char *filename)
 	char	*line;
 	size_t	 len;
 	size_t	 lineno = 0;
-	char	 delim[] = { '\\', '\\', '#' };
 
 	if (strcmp(filename, "-") == 0)
 		fp = fdopen(0, "r");
@@ -279,7 +279,8 @@ parse_map(char *filename)
 		return 0;
 	}
 
-	while ((line = fparseln(fp, &len, &lineno, delim, 0)) != NULL) {
+	while ((line = fparseln(fp, &len, &lineno,
+	    NULL, FPARSELN_UNESCCOMM)) != NULL) {
 		if (! parse_entry(line, len, lineno)) {
 			free(line);
 			fclose(fp);
@@ -316,7 +317,7 @@ parse_mapentry(char *line, size_t len, size_t lineno)
 	keyp = line;
 	while (isspace((unsigned char)*keyp))
 		keyp++;
-	if (*keyp == '\0' || *keyp == '#')
+	if (*keyp == '\0')
 		return 1;
 
 	valp = keyp;
@@ -325,7 +326,7 @@ parse_mapentry(char *line, size_t len, size_t lineno)
 		goto bad;
 	while (*valp == ':' || isspace((unsigned char)*valp))
 		valp++;
-	if (*valp == '\0' || *valp == '#')
+	if (*valp == '\0')
 		goto bad;
 
 	/* Check for dups. */
@@ -373,7 +374,7 @@ parse_setentry(char *line, size_t len, size_t lineno)
 	keyp = line;
 	while (isspace((unsigned char)*keyp))
 		keyp++;
-	if (*keyp == '\0' || *keyp == '#')
+	if (*keyp == '\0')
 		return 1;
 
 	val.data  = "<set>";
@@ -412,7 +413,6 @@ make_aliases(DBT *val, char *text)
 {
 	struct expandnode	xn;
 	char		       *subrcpt;
-	char		       *endp;
 	char		       *origtext;
 
 	val->data = NULL;
@@ -421,16 +421,10 @@ make_aliases(DBT *val, char *text)
 	origtext = xstrdup(text, "make_aliases");
 
 	while ((subrcpt = strsep(&text, ",")) != NULL) {
-		/* subrcpt: strip initial whitespace. */
-		while (isspace((unsigned char)*subrcpt))
-			++subrcpt;
+		/* subrcpt: strip initial and trailing whitespace. */
+		subrcpt = strip(subrcpt);
 		if (*subrcpt == '\0')
 			goto error;
-
-		/* subrcpt: strip trailing whitespace. */
-		endp = subrcpt + strlen(subrcpt) - 1;
-		while (subrcpt < endp && isspace((unsigned char)*endp))
-			*endp-- = '\0';
 
 		if (! text_to_expandnode(&xn, subrcpt))
 			goto error;
