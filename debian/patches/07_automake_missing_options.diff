@@ -6,14 +6,14 @@ Author: Ryan Kavanagh <rak@debian.org>
 This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
 Index: opensmtpd/configure.ac
 ===================================================================
---- opensmtpd.orig/configure.ac	2015-02-19 12:46:10.719662527 -0500
-+++ opensmtpd/configure.ac	2015-02-19 12:46:10.715662415 -0500
+--- opensmtpd.orig/configure.ac	2015-10-18 21:22:10.544252701 -0400
++++ opensmtpd/configure.ac	2015-10-18 21:22:18.424494608 -0400
 @@ -43,7 +43,7 @@
  AC_PATH_PROG([MANDOC], [mandoc])
  AC_PROG_YACC
  
--AM_INIT_AUTOMAKE
-+AM_INIT_AUTOMAKE([foreign subdir-objects])
+-AM_INIT_AUTOMAKE([subdir-objects no-dependencies])
++AM_INIT_AUTOMAKE([foreign subdir-objects no-dependencies])
  
  LT_INIT
  
