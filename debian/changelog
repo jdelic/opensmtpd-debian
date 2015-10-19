@@ -1,9 +1,21 @@
-opensmtpd (5.4.4p1-1) unstable; urgency=medium
+opensmtpd (5.7.3p1-1) UNRELEASED; urgency=high
 
   * New upstream release
-    + Drop 06_man_cleanup.diff, applied upstream
-    + Drop 11_compile_warnings.diff; applied upstream
-    + Drop 12_ssl_check.diff; applied upstream
+    + Fixes security issues (Closes: #800787, CVE-2015-7687). This point
+      release also features fixes to security issues that weren't part of the
+      Qualsys audit.
+    + No longer have conflicting declarations of fatal in source
+      (Closes: #749810)
+  * Drop 02_hyphen_as_minus_sign.diff, 06_man_cleanup.diff,
+    11_compile_warnings.diff, 12_ssl_check.diff. All applied upstream
+  * Updated 07_automake_missing_options.diff to reflect changes to upstream
+    source
+  * Update the copyright file
+  * Drop our local copy of the upstream changelog
+  * Recommend opensmtpd-extras: the tables and filters have been forked off
+    into a separate project upstream
+  * Drop useless build-dependencies on autoconf/automake/libtool: these are
+    already brought in by dh-autoreconf
 
  -- Ryan Kavanagh <rak@debian.org>  Thu, 19 Feb 2015 12:50:56 -0500
 
