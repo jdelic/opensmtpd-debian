@@ -18,9 +18,6 @@ override_dh_auto_configure:
 	    --with-queue-user=opensmtpq \
 	    --with-ca-file=/etc/ssl/certs/ca-certificates.crt
 
-override_dh_installchangelogs:
-	dh_installchangelogs debian/upstream_changelog.txt
-
 override_dh_fixperms:
 	dh_fixperms
 	chmod 711 debian/opensmtpd/var/spool/smtpd
