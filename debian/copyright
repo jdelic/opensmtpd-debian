@@ -3,8 +3,8 @@ Upstream-Name: opensmtpd
 Source: http://www.opensmtpd.org/
 
 Files: *
-Copyright: Copyright (C) 2006-2014 Gilles Chehade <gilles@poolp.org>,<gilles@openbsd.org>
-           Copyright (C) 2011-2013 Eric Faurot <eric@faurot.net>,<eric@openbsd.org>
+Copyright: Copyright (C) 2006-2015 Gilles Chehade <gilles@poolp.org>,<gilles@openbsd.org>
+           Copyright (C) 2011-2014 Eric Faurot <eric@faurot.net>,<eric@openbsd.org>
            Copyright (C) 2012      Charles Longeau <chl@openbsd.org>
            Copyright (C) 1996      David Mazieres <dm@uun.org>
            Copyright (C) 1999-2008 Damien Miller <djm@openbsd.org>
@@ -14,22 +14,19 @@ Copyright: Copyright (C) 2006-2014 Gilles Chehade <gilles@poolp.org>,<gilles@ope
            Copyright (C) 2002-2005 Henning Brauer <henning@openbsd.org>,<henning@bulabula.org>
            Copyright (C) 2003      Peter Stuge <stuge-mdoc2man@cdy.org>
            Copyright (C) 2004-2005 Esben Norby <norby@openbsd.org>
-           Copyright (C) 2005-2007 Claudio Jeker <claudio@openbsd.org>
-           Copyright (C) 2006-2007 Marc Balmer <mbalmer@openbsd.org>
+           Copyright (C) 2005      Claudio Jeker <claudio@openbsd.org>
            Copyright (C) 2006-2008 Pierre-Yves Ritschard <pyr@openbsd.org>
-           Copyright (C) 2007-2008 Reyk Floeter <reyk@vantronix.net>,<reyk@openbsd.org>
-           Copyright (C) 2008      Alexander Schrijver <aschrijver@openbsd.org>
+           Copyright (C) 2006,2014 Reyk Floeter <reyk@openbsd.org>
            Copyright (C) 2008      Janne Johansson <jj@openbsd.org>
            Copyright (C) 2008-2009 Jacek Masiulaniec <jacekm@dobremiasto.net>,<jacekm@openbsd.org>
            Copyright (C) 2013      Ashish Shukla <ashish.is@lostca.se>
            Copyright (C) 2013      Ryan Kavanagh <rak@debian.org>
            Copyright (C) 2013      Sunil Nimmagadda <sunil@sunilnimmagadda.com>
-           Copyright (C) 2014      Michael Neumann <mneumann@ntecs.de>
 License: ISC
 
 
 Files: debian/*
-Copyright: Copyright (C) 2013-2014 Ryan Kavanagh <rak@debian.org>
+Copyright: Copyright (C) 2013-2015 Ryan Kavanagh <rak@debian.org>
            Copyright (C) 2013      Daniel Walrond <debian@djw.org.uk>
            Copyright (C) 2013      Justin B Rye <justin.byam.rye@gmail.com>
            Copyright (C) 2013      Jason Barbier <jabarb@serversave.us>
@@ -53,7 +50,7 @@ Copyright: Copyright (C) 2013 Ryan Kavanagh <rak@debian.org>
 License: ISC
 
 
-Files: smtpd/ssl_privsep.c
+Files: smtpd/libressl.c
 Copyright: Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
 License: BSD-4-clause and additional-restrictions
  All rights reserved.
@@ -115,15 +112,6 @@ License: BSD-4-clause and additional-restrictions
  Adapted from openssl's ssl_rsa.c by Pierre-Yves Ritschard .
 
 
-Files: contrib/lib/libc/asr/*
-Copyright: Copyright (C) 2009-2013 Eric Faurot <eric@openbsd.org>
-	   Copyright (C) 1999-2001 Internet Software Consortium
-License: ISC
-
-Files: contrib/lib/libc/asr/getrrsetbyname_async.c
-Copyright: Copyright (C) 2001 Jakob Schlyter
-License: BSD-2-clause
-
 Files: contrib/libexec/mail.local/*
 Copyright: Copyright (C) 1990      The Regents of the University of California.
 	   Copyright (C) 1996-1998 David Mazieres <dm@lcs.mit.edu>
@@ -141,7 +129,10 @@ Copyright: Copyright (C) 1996            Internet Software Consortium.
 	   Copyright (C) 2006-2008       Reyk Floeter <reyk@openbsd.org>
 	   Copyright (C) 1996-1998, 2008 Theo de Raadt
 	   Copyright (C) 2004            Ted Unangst
+           Copyright (c) 2008            Otto Moerbeek <otto@drijf.net>
 	   Copyright (C) 2012            Charles Longeau <chl@openbsd.org>
+           Copyright (C) 2012            Eric Faurot <eric@openbsd.org>
+           Copyright (c) 2015		 Joerg Jung <jung@openbsd.org>
 Comment: Most of the OpenBSD compatibility layer is based on the work by
  Damien Miller for Portable OpenSSH.
 License: ISC
@@ -182,7 +173,6 @@ Files: openbsd-compat/bsd-waitpid.*
 Copyright: Copyright (C) 2000, 2003 Ben Lindstrom
            Copyright (c) 1999       The NetBSD Foundation, Inc.
 	   Copyright (C) 1999-2003  Damien Miller
-	   Copyright (C) 2001       Marc Espie
 	   Copyright (C) 2002       Tim Rice
 	   Copyright (C) 2002       Niels Provos <provos@citi.umich.edu>
 License: BSD-2-clause
@@ -230,7 +220,6 @@ License: BSD-3-clause and additional-restrictions
  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Files: openbsd-compat/includes.h
-       openbsd-compat/log.h
        openbsd-compat/setresguid.c
        openbsd-compat/xmalloc.c
 Copyright: Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -243,37 +232,79 @@ License: permissive
  incompatible with the protocol description in the RFC file, it must be
  called by a name other than "ssh" or "Secure Shell".
 
+Files: openbsd-compat/libressl.c
+Copyright: Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
+License: BSD-4-clause and additional-restrictions
+ All rights reserved.
+ .
+ This package is an SSL implementation written
+ by Eric Young (eay@cryptsoft.com).
+ The implementation was written so as to conform with Netscapes SSL.
+ .
+ This library is free for commercial and non-commercial use as long as
+ the following conditions are aheared to.  The following conditions
+ apply to all code found in this distribution, be it the RC4, RSA,
+ lhash, DES, etc., code; not just the SSL code.  The SSL documentation
+ included with this distribution is covered by the same copyright terms
+ except that the holder is Tim Hudson (tjh@cryptsoft.com).
+ .
+ Copyright remains Eric Young's, and as such any Copyright notices in
+ the code are not to be removed.
+ If this package is used in a product, Eric Young should be given attribution
+ as the author of the parts of the library used.
+ This can be in the form of a textual message at program startup or
+ in documentation (online or textual) provided with the package.
+ .
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+ 1. Redistributions of source code must retain the copyright
+    notice, this list of conditions and the following disclaimer.
+ 2. Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+ 3. All advertising materials mentioning features or use of this software
+    must display the following acknowledgement:
+    "This product includes cryptographic software written by
+     Eric Young (eay@cryptsoft.com)"
+    The word 'cryptographic' can be left out if the rouines from the library
+    being used are not cryptographic related :-).
+ 4. If you include any Windows specific code (or a derivative thereof) from
+    the apps directory (application code) you must include an acknowledgement:
+    "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
+ .
+ THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ SUCH DAMAGE.
+ .
+ The licence and distribution terms for any publically available version or
+ derivative of this code cannot be changed.  i.e. this code cannot simply be
+ copied and put under another distribution licence
+ [including the GNU Public Licence.]
 
-Files: aclocal.m4
-       mk/Makefile.in
-       mk/filters/stub/Makefile.in
-       mk/filters/monkey/Makefile.in
-       mk/filters/Makefile.in
-       mk/filters/dnsbl/Makefile.in
-       mk/filters/trace/Makefile.in
-       mk/smtpctl/Makefile.in
-       mk/makemap/Makefile.in
-       mk/backends/table-passwd/Makefile.in
-       mk/backends/table-stub/Makefile.in
-       mk/backends/table-postgres/Makefile.in
-       mk/backends/scheduler-ram/Makefile.in
-       mk/backends/queue-null/Makefile.in
-       mk/backends/table-sqlite/Makefile.in
-       mk/backends/table-mysql/Makefile.in
-       mk/backends/Makefile.in
-       mk/backends/queue-ram/Makefile.in
-       mk/backends/queue-stub/Makefile.in
-       mk/backends/scheduler-stub/Makefile.in
-       mk/backends/table-ldap/Makefile.in
-       mk/smtpd/Makefile.in
+
+Files:
+       Makefile.in
+       aclocal.m4
+       contrib/Makefile.in
+       contrib/libexec/Makefile.in
        contrib/libexec/encrypt/Makefile.in
        contrib/libexec/mail.local/Makefile.in
-       contrib/libexec/Makefile.in
-       contrib/Makefile.in
+       mk/Makefile.in
+       mk/makemap/Makefile.in
+       mk/smtpctl/Makefile.in
+       mk/smtpd/Makefile.in
        openbsd-compat/Makefile.in
-       Makefile.in
-Copyright: Copyright (c) 1996-2013 Free Software foundation, Inc.
-License: permissive
+Copyright: Copyright (c) 1996-2014 Free Software foundation, Inc.
+License: permissive-
  This file is free software; the Free Software Foundation
  gives unlimited permission to copy and/or distribute it,
  with or without modifications, as long as this notice is preserved.
@@ -282,6 +313,18 @@ License: permissive
  but WITHOUT ANY WARRANTY, to the extent permitted by law; without
  even the implied warranty of MERCHANTABILITY or FITNESS FOR A
  PARTICULAR PURPOSE.
+
+Files:
+       m4/libtool.m4
+       m4/ltoptions.m4
+       m4/ltsugar.m4
+       m4/ltversion.m4
+       m4/lt~obsolete.m4
+Copyright: Copyright (c) 1996-2009 Free Software foundation, Inc.
+License: permissive
+ This file is free software; the Free Software Foundation
+ gives unlimited permission to copy and/or distribute it,
+ with or without modifications, as long as this notice is preserved.
 
 Files: configure
 Copyright: Copyright (C) 1992-2012 Free Software Foundation, Inc.
@@ -313,8 +356,9 @@ License: permissive and GPL-2+ with Autoconf exception
  On Debian systems, the full text of the GNU General Public License
  version 2 can be found in the file `/usr/share/common-licenses/GPL-2'.
 
-Files: config.guess config.sub
-Copyright: Copyright (c) 1996-2013 Free Software foundation, Inc.
+Files: config.guess
+       config.sub
+Copyright: Copyright (c) 1996-2014 Free Software foundation, Inc.
 License: GPL-3+ with Autoconf exception
  This file is free software; you can redistribute it and/or modify it
  under the terms of the GNU General Public License as published by
@@ -338,6 +382,29 @@ License: GPL-3+ with Autoconf exception
  .
  On Debian systems, the full text of the GNU General Public License
  version 3 can be found in the file `/usr/share/common-licenses/GPL-3'.
+
+Files: compile
+       missing
+       ylwrap
+Copyright: Copyright (C) 1996-2014 Free Software Foundation, Inc.
+License: GPL-2+ with Autoconf exception
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2, or (at your option)
+ any later version.
+ .
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ .
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ .
+ As a special exception to the GNU General Public License, if you
+ distribute this file as part of a program that contains a
+ configuration script generated by Autoconf, you may include it under
+ the same distribution terms that you use for the rest of that program.
 
 Files: install-sh
 Copyright: Copyright (C) 1994 X Consortium
