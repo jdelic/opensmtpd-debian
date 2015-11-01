@@ -10,3 +10,5 @@ opensmtpd: hardening-no-fortify-functions usr/lib/*/opensmtpd/mail.local
 opensmtpd: hardening-no-fortify-functions usr/sbin/makemap
 opensmtpd: hardening-no-fortify-functions usr/sbin/smtpctl
 opensmtpd: hardening-no-fortify-functions usr/sbin/smtpd
+# The mistake is in the license text
+opensmtpd: spelling-error-in-copyright GNU Public Licence GNU General Public License
