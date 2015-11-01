@@ -1,4 +1,4 @@
-opensmtpd (5.7.3p1-1) UNRELEASED; urgency=high
+opensmtpd (5.7.3p1-1) unstable; urgency=high
 
   * New upstream release
     + Fixes security issues (Closes: #800787, CVE-2015-7687). This point
@@ -10,14 +10,22 @@ opensmtpd (5.7.3p1-1) UNRELEASED; urgency=high
     11_compile_warnings.diff, 12_ssl_check.diff. All applied upstream
   * Updated 07_automake_missing_options.diff to reflect changes to upstream
     source
+  * Fix typo in manpage, 11_smtpd.conf.5_typo.diff
   * Update the copyright file
   * Drop our local copy of the upstream changelog
   * Recommend opensmtpd-extras: the tables and filters have been forked off
     into a separate project upstream
+  * (Build-)Depend on libasr: this library has also forked off into a
+    stand-alone project
   * Drop useless build-dependencies on autoconf/automake/libtool: these are
     already brought in by dh-autoreconf
+  * Update lintian overrides: we drop overrides for filters moved to
+    opensmtpd-extras, add overrides due to a broken dep5 check, and
+    override spelling-error-in-copyright (the error is in the license text)
+  * Update configure options in rules to continue building the db table and
+    makemap
 
- -- Ryan Kavanagh <rak@debian.org>  Thu, 19 Feb 2015 12:50:56 -0500
+ -- Ryan Kavanagh <rak@debian.org>  Sun, 01 Nov 2015 20:56:47 -0500
 
 opensmtpd (5.4.2p1-4) unstable; urgency=medium
 
