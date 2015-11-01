@@ -1,0 +1,6 @@
+# The check is too severe, see bug #779676
+opensmtpd source: dep5-copyright-license-name-not-unique
+# The check is broken and fails to see the standalone paragraph a few lines
+# later.
+opensmtpd source: missing-license-paragraph-in-dep5-copyright isc (paragraph at line 445)
+opensmtpd source: missing-license-paragraph-in-dep5-copyright bsd-3-clause (paragraph at line 180)
