@@ -1,3 +1,14 @@
+opensmtpd (5.7.3p2-1) unstable; urgency=medium
+
+  * New upstream release
+    + Fixes segfault when relaying mail (Closes: #813398)
+  * Make Vcs-* URLs secure
+  * 'fortify' hardening option no longer detects false-positive buffer
+    overflow when processing offline queue. Reenabling.
+    + Accordingly, drop unneeded hardening-no-fortify overrides.
+
+ -- Ryan Kavanagh <rak@debian.org>  Thu, 11 Feb 2016 09:09:22 -0500
+
 opensmtpd (5.7.3p1-1) unstable; urgency=high
 
   * New upstream release
