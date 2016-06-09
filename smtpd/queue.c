@@ -1,4 +1,4 @@
-/*	$OpenBSD: queue.c,v 1.162 2014/04/19 13:40:24 gilles Exp $	*/
+/*	$OpenBSD: queue.c,v 1.177 2016/04/29 08:55:08 eric Exp $	*/
 
 /*
  * Copyright (c) 2008 Gilles Chehade <gilles@poolp.org>
@@ -78,7 +78,6 @@ queue_imsg(struct mproc *p, struct imsg *imsg)
 	time_t			 nexttry;
 	size_t			 n_evp;
 	int			 fd, mta_ext, ret, v, flags, code;
-	char			 buf[sizeof(evp)];
 
 	memset(&bounce, 0, sizeof(struct delivery_bounce));
 	if (p->proc == PROC_PONY) {
@@ -242,6 +241,7 @@ queue_imsg(struct mproc *p, struct imsg *imsg)
 			return;
 
 		case IMSG_SCHED_ENVELOPE_BOUNCE:
+			CHECK_IMSG_DATA_SIZE(imsg, sizeof *req_bounce);
 			req_bounce = imsg->data;
 			evpid = req_bounce->evpid;
 
@@ -322,9 +322,6 @@ queue_imsg(struct mproc *p, struct imsg *imsg)
 			 * its way back to the scheduler.  We need to detect
 			 * this properly and report that state.
 			 */
-			evp.flags |= flags;
-			/* In the past if running or runnable */
-			evp.nexttry = nexttry;
 			if (flags & EF_INFLIGHT) {
 				/*
 				 * Not exactly correct but pretty close: The
@@ -334,10 +331,12 @@ queue_imsg(struct mproc *p, struct imsg *imsg)
 				evp.lasttry = nexttry;
 			}
 
-			(void)memcpy(buf, &evp.id, sizeof evp.id);
-			envelope_dump_buffer(&evp, buf+8, sizeof(buf)-8);
-			m_compose(p_control, IMSG_CTL_LIST_ENVELOPES,
-			    imsg->hdr.peerid, 0, -1, buf, 8 + strlen(buf+8) + 1);
+			m_create(p_control, IMSG_CTL_LIST_ENVELOPES,
+			    imsg->hdr.peerid, 0, -1);
+			m_add_int(p_control, flags);
+			m_add_time(p_control, nexttry);
+			m_add_envelope(p_control, &evp);
+			m_close(p_control);
 			return;
 		}
 	}
@@ -370,7 +369,7 @@ queue_imsg(struct mproc *p, struct imsg *imsg)
 			if (evp.dsn_notify & DSN_SUCCESS) {
 				bounce.type = B_DSN;
 				bounce.dsn_ret = evp.dsn_ret;
-
+				envelope_set_esc_class(&evp, ESC_STATUS_OK);
 				if (imsg->hdr.type == IMSG_MDA_DELIVERY_OK)
 					queue_bounce(&evp, &bounce);
 				else if (imsg->hdr.type == IMSG_MTA_DELIVERY_OK &&
@@ -618,7 +617,6 @@ queue_bounce(struct envelope *e, struct delivery_bounce *d)
 	b.lasttry = 0;
 	b.creation = time(NULL);
 	b.expire = 3600 * 24 * 7;
-	b.dsn_ret = e->dsn_ret;
 
 	if (e->dsn_notify & DSN_NEVER)
 		return;
@@ -712,7 +710,7 @@ queue(void)
 
 #ifdef HAVE_GCM_CRYPTO
 	if (env->sc_queue_key) {
-		if (! crypto_setup(env->sc_queue_key, strlen(env->sc_queue_key)))
+		if (!crypto_setup(env->sc_queue_key, strlen(env->sc_queue_key)))
 			fatalx("crypto_setup: invalid key for queue encryption");
 		log_info("queue: queue encryption enabled");
 	}
@@ -745,6 +743,9 @@ queue(void)
 	tv.tv_sec = 0;
 	tv.tv_usec = 10;
 	evtimer_add(&ev_qload, &tv);
+
+	if (pledge("stdio rpath wpath cpath flock recvfd sendfd", NULL) == -1)
+		err(1, "pledge");
 
 	if (event_dispatch() <  0)
 		fatal("event_dispatch");
@@ -796,13 +797,13 @@ static void
 queue_log(const struct envelope *e, const char *prefix, const char *status)
 {
 	char rcpt[LINE_MAX];
-	
+
 	(void)strlcpy(rcpt, "-", sizeof rcpt);
 	if (strcmp(e->rcpt.user, e->dest.user) ||
 	    strcmp(e->rcpt.domain, e->dest.domain))
 		(void)snprintf(rcpt, sizeof rcpt, "%s@%s",
 		    e->rcpt.user, e->rcpt.domain);
-	
+
 	log_info("%s: %s for %016" PRIx64 ": from=<%s@%s>, to=<%s@%s>, "
 	    "rcpt=<%s>, delay=%s, stat=%s",
 	    e->type == D_MDA ? "delivery" : "relay",

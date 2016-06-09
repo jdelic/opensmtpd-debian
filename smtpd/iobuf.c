@@ -1,5 +1,5 @@
-/*	$OpenBSD$	*/
-/*      
+/*	$OpenBSD: iobuf.c,v 1.9 2015/12/14 10:22:12 jung Exp $	*/
+/*
  * Copyright (c) 2012 Eric Faurot <eric@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -69,8 +69,7 @@ iobuf_clear(struct iobuf *io)
 {
 	struct ioqbuf	*q;
 
-	if (io->buf)
-		free(io->buf);
+	free(io->buf);
 
 	while ((q = io->outq)) {
 		io->outq = q->next;
@@ -397,7 +396,7 @@ iobuf_flush_ssl(struct iobuf *io, void *ssl)
 	ssize_t	s;
 
 	while (io->queued)
-		if ((s = iobuf_write_ssl(io, ssl) < 0))
+		if ((s = iobuf_write_ssl(io, ssl)) < 0)
 			return (s);
 
 	return (0);

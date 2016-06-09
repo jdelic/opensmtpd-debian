@@ -1,4 +1,4 @@
-/*	$OpenBSD: to.c,v 1.17 2014/04/19 14:27:29 gilles Exp $	*/
+/*	$OpenBSD: to.c,v 1.26 2016/02/15 12:53:50 mpi Exp $	*/
 
 /*
  * Copyright (c) 2009 Jacek Masiulaniec <jacekm@dobremiasto.net>
@@ -35,7 +35,6 @@
 #include <errno.h>
 #include <event.h>
 #include <fcntl.h>
-#include <fts.h>
 #include <imsg.h>
 #include <limits.h>
 #include <inttypes.h>
@@ -134,7 +133,7 @@ text_to_mailaddr(struct mailaddr *maddr, const char *email)
 		if (strlcpy(maddr->domain, hostname, sizeof maddr->domain)
 		    >= sizeof maddr->domain)
 			return 0;
-	}	
+	}
 
 	return 1;
 }
@@ -207,7 +206,7 @@ time_to_text(time_t when)
 		fatalx("time_to_text: localtime");
 
 	/* We do not use strftime because it is subject to locale substitution*/
-	if (! bsnprintf(buf, sizeof(buf),
+	if (!bsnprintf(buf, sizeof(buf),
 	    "%s, %d %s %d %02d:%02d:%02d %c%02d%02d (%s)",
 	    day[lt->tm_wday], lt->tm_mday, month[lt->tm_mon],
 	    lt->tm_year + 1900,
@@ -421,7 +420,7 @@ text_to_relayhost(struct relayhost *relay, const char *s)
 	}
 	else {
 		for (end = beg; *end; ++end)
-			if (! isalnum((unsigned char)*end) &&
+			if (!isalnum((unsigned char)*end) &&
 			    *end != '_' && *end != '.' && *end != '-')
 				break;
 		len = end - beg;
@@ -440,7 +439,7 @@ text_to_relayhost(struct relayhost *relay, const char *s)
 			return 0;
 	}
 
-	if (! valid_domainpart(relay->hostname))
+	if (!valid_domainpart(relay->hostname))
 		return 0;
 	if ((relay->flags & F_LMTP) && (relay->port == 0))
 		return 0;
@@ -624,7 +623,7 @@ rule_to_text(struct rule *r)
 	case A_NONE:
 		break;
 	}
-	    
+
 	return buf;
 }
 
@@ -884,7 +883,7 @@ alias_is_include(struct expandnode *alias, const char *line, size_t len)
 	else
 		return 0;
 
-	if (! alias_is_filename(alias, line + skip, len - skip))
+	if (!alias_is_filename(alias, line + skip, len - skip))
 		return 0;
 
 	alias->type = EXPAND_INCLUDE;

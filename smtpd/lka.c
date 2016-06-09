@@ -1,4 +1,4 @@
-/*	$OpenBSD$	*/
+/*	$OpenBSD: lka.c,v 1.192 2016/01/22 13:10:41 gilles Exp $	*/
 
 /*
  * Copyright (c) 2008 Pierre-Yves Ritschard <pyr@openbsd.org>
@@ -194,6 +194,7 @@ lka_imsg(struct mproc *p, struct imsg *imsg)
 			if (req_ca_vrfy == NULL)
 				fatalx("lka:ca_vrfy: verify without a certificate");
 			lka_certificate_verify(imsg->hdr.type, req_ca_vrfy);
+			req_ca_vrfy = NULL;
 			return;
 
 		case IMSG_SMTP_AUTHENTICATE:
@@ -323,7 +324,14 @@ lka_imsg(struct mproc *p, struct imsg *imsg)
 		case IMSG_CONF_END:
 			if (verbose & TRACE_TABLES)
 				table_dump_all();
+
+			/* fork & exec tables that need it */
 			table_open_all();
+
+			/* revoke proc & exec */
+			if (pledge("stdio rpath inet dns getpw recvfd",
+				NULL) == -1)
+				err(1, "pledge");
 
 			/* Start fulfilling requests */
 			mproc_enable(p_pony);
@@ -452,6 +460,10 @@ lka(void)
 	/* Ignore them until we get our config */
 	mproc_disable(p_pony);
 
+	/* proc & exec will be revoked before serving requests */
+	if (pledge("stdio rpath inet dns getpw recvfd proc exec", NULL) == -1)
+		err(1, "pledge");
+
 	if (event_dispatch() < 0)
 		fatal("event_dispatch");
 	lka_shutdown();
@@ -463,6 +475,7 @@ static int
 lka_authenticate(const char *tablename, const char *user, const char *password)
 {
 	struct table		*table;
+	char			*cpass;
 	union lookup		 lk;
 
 	log_debug("debug: lka: authenticating for %s:%s", tablename, user);
@@ -481,7 +494,10 @@ lka_authenticate(const char *tablename, const char *user, const char *password)
 	case 0:
 		return (LKA_PERMFAIL);
 	default:
-		if (!strcmp(lk.creds.password, crypt(password, lk.creds.password)))
+		cpass = crypt(password, lk.creds.password);
+		if (cpass == NULL)
+			return (LKA_PERMFAIL);
+		if (!strcmp(lk.creds.password, cpass))
 			return (LKA_OK);
 		return (LKA_PERMFAIL);
 	}
@@ -521,7 +537,7 @@ lka_credentials(const char *tablename, const char *label, char *dst, size_t sz)
 
 		r = base64_encode((unsigned char *)buf, buflen, dst, sz);
 		free(buf);
-		
+
 		if (r == -1) {
 			log_warnx("warn: credentials parse error for %s:%s",
 			    tablename, label);
@@ -585,7 +601,7 @@ lka_addrname(const char *tablename, const struct sockaddr *sa,
 		*res = lk.addrname;
 		return (LKA_OK);
 	}
-}      
+}
 
 static int
 lka_mailaddrmap(const char *tablename, const char *username, const struct mailaddr *maddr)
@@ -612,7 +628,7 @@ lka_mailaddrmap(const char *tablename, const char *username, const struct mailad
 	default:
 		found = 0;
 		TAILQ_FOREACH(mn, &lk.maddrmap->queue, entries) {
-			if (! mailaddr_match(maddr, &mn->mailaddr))
+			if (!mailaddr_match(maddr, &mn->mailaddr))
 				continue;
 			found = 1;
 			break;
@@ -657,12 +673,12 @@ lka_X509_verify(struct ca_vrfy_req_msg *vrfy,
 			x509_tmp = NULL;
 		}
 	}
-	if (! ca_X509_verify(x509, x509_chain, CAfile, NULL, &errstr))
+	if (!ca_X509_verify(x509, x509_chain, CAfile, NULL, &errstr))
 		log_debug("debug: lka: X509 verify: %s", errstr);
 	else
 		ret = 1;
 
-end:	
+end:
 	if (x509)
 		X509_free(x509);
 	if (x509_tmp)
@@ -686,7 +702,7 @@ lka_certificate_verify_resume(enum imsg_type type, struct ca_vrfy_req_msg *req)
 	struct ca		       *sca;
 	const char		       *cafile;
 	size_t				i;
-	
+
 	resp.reqid = req->reqid;
 	sca = dict_get(env->sc_ca_dict, req->name);
 	if (sca == NULL)
@@ -696,14 +712,14 @@ lka_certificate_verify_resume(enum imsg_type type, struct ca_vrfy_req_msg *req)
 
 	if (sca == NULL && !req->fallback)
 		resp.status = CA_FAIL;
-	else if (! lka_X509_verify(req, cafile, NULL))
+	else if (!lka_X509_verify(req, cafile, NULL))
 		resp.status = CA_FAIL;
 	else
 		resp.status = CA_OK;
-	
+
 	m_compose(p_pony, type, 0, 0, -1, &resp,
 	    sizeof resp);
-	
+
 	for (i = 0; i < req->n_chain; ++i)
 		free(req->chain_cert[i]);
 	free(req->chain_cert);

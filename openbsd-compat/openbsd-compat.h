@@ -72,12 +72,6 @@ size_t strlcat(char *dst, const char *src, size_t size);
 void strmode(int mode, char *p);
 #endif
 
-#if !defined(HAVE_MKDTEMP) || defined(HAVE_STRICT_MKSTEMP)
-int mkstemps(char *path, int slen);
-int mkstemp(char *path);
-char *mkdtemp(char *path);
-#endif 
-
 #ifndef HAVE_DAEMON
 int daemon(int nochdir, int noclose);
 #endif 
@@ -149,7 +143,7 @@ int asprintf(char **, const char *, ...);
 /* #include <sys/types.h> XXX needed? For size_t */
 
 #ifndef HAVE_SNPRINTF
-int snprintf(char *, size_t, SNPRINTF_CONST char *, ...);
+int snprintf(char *, size_t, const char *, ...);
 #endif 
 
 #ifndef HAVE_STRTOLL
@@ -214,4 +208,15 @@ void *reallocarray(void *, size_t, size_t);
 void errc(int, int, const char *, ...);
 #endif
 
+#ifndef HAVE_PLEDGE
+#define pledge(promises, paths) 0
+#endif
+
+#if !HAVE_DECL_AF_LOCAL
+#define AF_LOCAL AF_UNIX
+#endif
+
+#if !HAVE_DECL_WAIT_MYPGRP
+#define WAIT_MYPGRP 0
+#endif
 #endif /* _OPENBSD_COMPAT_H */
