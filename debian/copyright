@@ -21,12 +21,12 @@ Copyright: Copyright (C) 2006-2015 Gilles Chehade <gilles@poolp.org>,<gilles@ope
            Copyright (C) 2008-2009 Jacek Masiulaniec <jacekm@dobremiasto.net>,<jacekm@openbsd.org>
            Copyright (C) 2013      Ashish Shukla <ashish.is@lostca.se>
            Copyright (C) 2013      Ryan Kavanagh <rak@debian.org>
-           Copyright (C) 2013      Sunil Nimmagadda <sunil@sunilnimmagadda.com>
+           Copyright (C) 2013,2015 Sunil Nimmagadda <sunil@sunilnimmagadda.com>
 License: ISC
 
 
 Files: debian/*
-Copyright: Copyright (C) 2013-2015 Ryan Kavanagh <rak@debian.org>
+Copyright: Copyright (C) 2013-2016 Ryan Kavanagh <rak@debian.org>
            Copyright (C) 2013      Daniel Walrond <debian@djw.org.uk>
            Copyright (C) 2013      Justin B Rye <justin.byam.rye@gmail.com>
            Copyright (C) 2013      Jason Barbier <jabarb@serversave.us>
@@ -121,18 +121,18 @@ License: BSD-3-clause
 
 Files: openbsd-compat/*
 Copyright: Copyright (C) 1996            Internet Software Consortium.
-	   Copyright (C) 1997-1998, 2000, 2002, 2004-2005,
-                         2008-2009       Todd C. Miller <Todd.Miller@courtesan.com>
+	   Copyright (C) 1997-1998, 2000, 2002,
+                         2004-2005       Todd C. Miller <Todd.Miller@courtesan.com>
 	   Copyright (C) 1999-2004       Damien Miller <djm@mindrot.org>
 	   Copyright (C) 2003-2004       Henning Brauer <henning@openbsd.org>
 	   Copyright (C) 2006-2007       Pierre-Yves Ritschard <pyr@openbsd.org>
 	   Copyright (C) 2006-2008       Reyk Floeter <reyk@openbsd.org>
-	   Copyright (C) 1996-1998, 2008 Theo de Raadt
 	   Copyright (C) 2004            Ted Unangst
            Copyright (c) 2008            Otto Moerbeek <otto@drijf.net>
 	   Copyright (C) 2012            Charles Longeau <chl@openbsd.org>
            Copyright (C) 2012            Eric Faurot <eric@openbsd.org>
            Copyright (c) 2015		 Joerg Jung <jung@openbsd.org>
+           Copyright (c) 2012, 2016      Gilles Chehade <gilles@poolp.org>
 Comment: Most of the OpenBSD compatibility layer is based on the work by
  Damien Miller for Portable OpenSSH.
 License: ISC
@@ -299,7 +299,6 @@ Files:
        contrib/libexec/encrypt/Makefile.in
        contrib/libexec/mail.local/Makefile.in
        mk/Makefile.in
-       mk/makemap/Makefile.in
        mk/smtpctl/Makefile.in
        mk/smtpd/Makefile.in
        openbsd-compat/Makefile.in
@@ -383,8 +382,7 @@ License: GPL-3+ with Autoconf exception
  On Debian systems, the full text of the GNU General Public License
  version 3 can be found in the file `/usr/share/common-licenses/GPL-3'.
 
-Files: compile
-       missing
+Files: missing
        ylwrap
 Copyright: Copyright (C) 1996-2014 Free Software Foundation, Inc.
 License: GPL-2+ with Autoconf exception
@@ -444,6 +442,7 @@ License: Expat and additional-restrictions and public-domain
 
 Files: configure.ac
 Copyright: Copyright (C) 1999-2004 Damien Miller
+           Copyright (c) 2016 Gilles Chehade <gilles@poolp.org>
 License: ISC
 
 
