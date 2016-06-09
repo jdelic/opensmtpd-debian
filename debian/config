@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (C) 2013 Ryan Kavanagh <rak@debian.org>
+# Copyright (C) 2013-2016 Ryan Kavanagh <rak@debian.org>
 # Distributed under the ISC license, as documented in opensmtpd's
 # debian/copyright file
 
@@ -7,7 +7,7 @@ set -e
 . /usr/share/debconf/confmodule
 
 getalias () {
-    sed -n "s/^${1}\s*:\s*\([^\s*#.*]*\)\s*#\?.*/\1/p" /etc/aliases
+    sed -n "s/^${1}\s*:\s*\([^#]*\).*/\1/p" /etc/aliases
 }
 
 db_fget opensmtpd/mailname seen || true
