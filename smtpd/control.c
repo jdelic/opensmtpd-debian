@@ -1,4 +1,4 @@
-/*	$OpenBSD: control.c,v 1.100 2014/04/19 11:17:14 gilles Exp $	*/
+/*	$OpenBSD: control.c,v 1.111 2016/02/09 10:38:02 gilles Exp $	*/
 
 /*
  * Copyright (c) 2012 Gilles Chehade <gilles@poolp.org>
@@ -153,6 +153,8 @@ control_imsg(struct mproc *p, struct imsg *imsg)
 		m_get_string(&m, &key);
 		m_get_data(&m, &data, &sz);
 		m_end(&m);
+		if (sz != sizeof(val))
+			fatalx("control: IMSG_STAT_INCREMENT size mismatch");
 		memmove(&val, data, sz);
 		if (stat_backend)
 			stat_backend->increment(key, val.u.counter);
@@ -163,6 +165,8 @@ control_imsg(struct mproc *p, struct imsg *imsg)
 		m_get_string(&m, &key);
 		m_get_data(&m, &data, &sz);
 		m_end(&m);
+		if (sz != sizeof(val))
+			fatalx("control: IMSG_STAT_DECREMENT size mismatch");
 		memmove(&val, data, sz);
 		if (stat_backend)
 			stat_backend->decrement(key, val.u.counter);
@@ -173,6 +177,8 @@ control_imsg(struct mproc *p, struct imsg *imsg)
 		m_get_string(&m, &key);
 		m_get_data(&m, &data, &sz);
 		m_end(&m);
+		if (sz != sizeof(val))
+			fatalx("control: IMSG_STAT_SET size mismatch");
 		memmove(&val, data, sz);
 		if (stat_backend)
 			stat_backend->set(key, &val);
@@ -199,20 +205,20 @@ control_sig_handler(int sig, short event, void *p)
 int
 control_create_socket(void)
 {
-	struct sockaddr_un	sun;
+	struct sockaddr_un	s_un;
 	int			fd;
 	mode_t			old_umask;
 
 	if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
 		fatal("control: socket");
 
-	memset(&sun, 0, sizeof(sun));
-	sun.sun_family = AF_UNIX;
-	if (strlcpy(sun.sun_path, SMTPD_SOCKET,
-	    sizeof(sun.sun_path)) >= sizeof(sun.sun_path))
+	memset(&s_un, 0, sizeof(s_un));
+	s_un.sun_family = AF_UNIX;
+	if (strlcpy(s_un.sun_path, SMTPD_SOCKET,
+	    sizeof(s_un.sun_path)) >= sizeof(s_un.sun_path))
 		fatal("control: socket name too long");
 
-	if (connect(fd, (struct sockaddr *)&sun, sizeof(sun)) == 0)
+	if (connect(fd, (struct sockaddr *)&s_un, sizeof(s_un)) == 0)
 		fatalx("control socket already listening");
 
 	if (unlink(SMTPD_SOCKET) == -1)
@@ -220,7 +226,7 @@ control_create_socket(void)
 			fatal("control: cannot unlink socket");
 
 	old_umask = umask(S_IXUSR|S_IXGRP|S_IWOTH|S_IROTH|S_IXOTH);
-	if (bind(fd, (struct sockaddr *)&sun, sizeof(sun)) == -1) {
+	if (bind(fd, (struct sockaddr *)&s_un, sizeof(s_un)) == -1) {
 		(void)umask(old_umask);
 		fatal("control: bind");
 	}
@@ -302,6 +308,9 @@ control(void)
 
 	control_listen();
 
+	if (pledge("stdio unix recvfd sendfd", NULL) == -1)
+		err(1, "pledge");
+
 	if (event_dispatch() < 0)
 		fatal("event_dispatch");
 	control_shutdown();
@@ -333,7 +342,7 @@ control_accept(int listenfd, short event, void *arg)
 {
 	int			 connfd;
 	socklen_t		 len;
-	struct sockaddr_un	 sun;
+	struct sockaddr_un	 s_un;
 	struct ctl_conn		*c;
 	size_t			*count;
 	uid_t			 euid;
@@ -342,8 +351,8 @@ control_accept(int listenfd, short event, void *arg)
 	if (available_fds(CONTROL_FD_RESERVE))
 		goto pause;
 
-	len = sizeof(sun);
-	if ((connfd = accept(listenfd, (struct sockaddr *)&sun, &len)) == -1) {
+	len = sizeof(s_un);
+	if ((connfd = accept(listenfd, (struct sockaddr *)&s_un, &len)) == -1) {
 		if (errno == ENFILE || errno == EMFILE)
 			goto pause;
 		if (errno == EINTR || errno == EWOULDBLOCK ||
@@ -510,7 +519,7 @@ control_dispatch_ext(struct mproc *p, struct imsg *imsg)
 		if (c->euid)
 			goto badcred;
 		kvp = imsg->data;
-		if (! stat_backend->iter(&kvp->iter, &key, &val))
+		if (!stat_backend->iter(&kvp->iter, &key, &val))
 			kvp->iter = NULL;
 		else {
 			(void)strlcpy(kvp->key, key, sizeof kvp->key);
@@ -675,7 +684,7 @@ control_dispatch_ext(struct mproc *p, struct imsg *imsg)
 		if (c->euid)
 			goto badcred;
 
-		if (! (env->sc_flags & SMTPD_MDA_PAUSED)) {
+		if (!(env->sc_flags & SMTPD_MDA_PAUSED)) {
 			m_compose(p, IMSG_CTL_FAIL, 0, 0, -1, NULL, 0);
 			return;
 		}

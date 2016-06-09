@@ -3,48 +3,23 @@
 /* Define if building universal (internal helper macro) */
 #undef AC_APPLE_UNIVERSAL_BUILD
 
-/* Define if cmsg_type is not passed correctly */
-#undef BROKEN_CMSG_TYPE
-
 /* getaddrinfo is broken (if present) */
 #undef BROKEN_GETADDRINFO
 
 /* FreeBSD glob does not do what we need */
 #undef BROKEN_GLOB
 
-/* Define if your struct dirent expects you to allocate extra space for d_name
-   */
-#undef BROKEN_ONE_BYTE_DIRENT_D_NAME
-
-/* Define if you have a broken realpath. */
-#undef BROKEN_REALPATH
-
-/* Define if your setregid() is broken */
+/* define if setregid is broken */
 #undef BROKEN_SETREGID
 
-/* Define if your setresgid() is broken */
-#undef BROKEN_SETRESGID
-
-/* Define if your setresuid() is broken */
-#undef BROKEN_SETRESUID
-
-/* Define if your setreuid() is broken */
+/* define if setreuid is broken */
 #undef BROKEN_SETREUID
-
-/* Define if your snprintf is busted */
-#undef BROKEN_SNPRINTF
 
 /* FreeBSD strnvis argument order is swapped compared to OpenBSD */
 #undef BROKEN_STRNVIS
 
 /* Define if you have BSD auth support */
 #undef BSD_AUTH
-
-/* fsid_t has member val */
-#undef FSID_HAS_VAL
-
-/* fsid_t has member __val */
-#undef FSID_HAS___VAL
 
 /* Define if your system uses access rights style file descriptor passing */
 #undef HAVE_ACCRIGHTS_IN_MSGHDR
@@ -79,7 +54,7 @@
 /* Define to 1 if you have the `b64_pton' function. */
 #undef HAVE_B64_PTON
 
-/* Define if you have the basename function. */
+/* Define if you have the basename() function. */
 #undef HAVE_BASENAME
 
 /* Define to 1 if you have the `bcopy' function. */
@@ -91,11 +66,8 @@
 /* Define to 1 if you have the `chflags' function. */
 #undef HAVE_CHFLAGS
 
-/* Have clock_gettime */
+/* Define if you have the clock_gettime() function. */
 #undef HAVE_CLOCK_GETTIME
-
-/* define if you have clock_t data type */
-#undef HAVE_CLOCK_T
 
 /* Define to 1 if you have the `closefrom' function. */
 #undef HAVE_CLOSEFROM
@@ -103,10 +75,13 @@
 /* Define if your system uses ancillary data style file descriptor passing */
 #undef HAVE_CONTROL_IN_MSGHDR
 
+/* Define if you have the crypt() function. */
+#undef HAVE_CRYPT
+
 /* Define to 1 if you have the <crypt.h> header file. */
 #undef HAVE_CRYPT_H
 
-/* Define if your libraries define daemon() */
+/* Define if you have the daemon() function. */
 #undef HAVE_DAEMON
 
 /* if you have the <db1/db.h> header file */
@@ -121,25 +96,17 @@
 /* if you have the <db.h> header file */
 #undef HAVE_DB_H
 
-/* Define to 1 if you have the declaration of `howmany', and to 0 if you
+/* Define to 1 if you have the declaration of `AF_LOCAL', and to 0 if you
    don't. */
-#undef HAVE_DECL_HOWMANY
-
-/* Define to 1 if you have the declaration of `MAXSYMLINKS', and to 0 if you
-   don't. */
-#undef HAVE_DECL_MAXSYMLINKS
-
-/* Define to 1 if you have the declaration of `NFDBITS', and to 0 if you
-   don't. */
-#undef HAVE_DECL_NFDBITS
-
-/* Define to 1 if you have the declaration of `offsetof', and to 0 if you
-   don't. */
-#undef HAVE_DECL_OFFSETOF
+#undef HAVE_DECL_AF_LOCAL
 
 /* Define to 1 if you have the declaration of `O_NONBLOCK', and to 0 if you
    don't. */
 #undef HAVE_DECL_O_NONBLOCK
+
+/* Define to 1 if you have the declaration of `WAIT_MYPGRP', and to 0 if you
+   don't. */
+#undef HAVE_DECL_WAIT_MYPGRP
 
 /* Define to 1 if you have the declaration of `writev', and to 0 if you don't.
    */
@@ -169,16 +136,13 @@
 /* Define to 1 if you have the <fcntl.h> header file. */
 #undef HAVE_FCNTL_H
 
-/* Define to 1 if the system has the type `fd_mask'. */
-#undef HAVE_FD_MASK
-
 /* Define to 1 if you have the `fgetln' function. */
 #undef HAVE_FGETLN
 
-/* Define to 1 if you have the `fmt_scaled' function. */
+/* Define if you have the fmt_scaled() function. */
 #undef HAVE_FMT_SCALED
 
-/* Define if your libraries define fparseln() */
+/* Define if you have the fparseln() function. */
 #undef HAVE_FPARSELN
 
 /* Define to 1 if you have the `freeaddrinfo' function. */
@@ -189,6 +153,9 @@
 
 /* Define to 1 if the system has the type `fsfilcnt_t'. */
 #undef HAVE_FSFILCNT_T
+
+/* Define if you have the fts_open() function. */
+#undef HAVE_FTS_OPEN
 
 /* Define if you want to use GCM crypto support */
 #undef HAVE_GCM_CRYPTO
@@ -217,8 +184,14 @@
 /* Define to 1 if you have the `gettimeofday' function. */
 #undef HAVE_GETTIMEOFDAY
 
+/* Define to 1 if you have the <grp.h> header file. */
+#undef HAVE_GRP_H
+
 /* Define to 1 if you have the `inet_aton' function. */
 #undef HAVE_INET_ATON
+
+/* Define to 1 if you have the `inet_net_pton' function. */
+#undef HAVE_INET_NET_PTON
 
 /* Define to 1 if you have the `inet_ntoa' function. */
 #undef HAVE_INET_NTOA
@@ -226,17 +199,14 @@
 /* Define to 1 if you have the `inet_ntop' function. */
 #undef HAVE_INET_NTOP
 
-/* define if you have int64_t data type */
-#undef HAVE_INT64_T
-
 /* Define to 1 if the system has the type `intmax_t'. */
 #undef HAVE_INTMAX_T
 
+/* Define to 1 if the system has the type `intptr_t'. */
+#undef HAVE_INTPTR_T
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
-
-/* define if you have intxx_t data type */
-#undef HAVE_INTXX_T
 
 /* Define to 1 if the system has the type `in_addr_t'. */
 #undef HAVE_IN_ADDR_T
@@ -250,23 +220,14 @@
 /* Define to 1 if you have the `asr' library (-lasr). */
 #undef HAVE_LIBASR
 
-/* Define to 1 if you have the `crypt' library (-lcrypt). */
-#undef HAVE_LIBCRYPT
-
 /* Define to 1 if you have the `dl' library (-ldl). */
 #undef HAVE_LIBDL
 
 /* Define to 1 if you have the <libgen.h> header file. */
 #undef HAVE_LIBGEN_H
 
-/* Define to 1 if you have the `nsl' library (-lnsl). */
-#undef HAVE_LIBNSL
-
 /* Define to 1 if you have the `pam' library (-lpam). */
 #undef HAVE_LIBPAM
-
-/* Define to 1 if you have the `socket' library (-lsocket). */
-#undef HAVE_LIBSOCKET
 
 /* Define to 1 if you have the <libutil.h> header file. */
 #undef HAVE_LIBUTIL_H
@@ -286,6 +247,9 @@
 /* Define to 1 if the system has the type `long long'. */
 #undef HAVE_LONG_LONG
 
+/* Define to 1 if the system has the type `long long int'. */
+#undef HAVE_LONG_LONG_INT
+
 /* Define to 1 if you have the <mach/mach_time.h> header file. */
 #undef HAVE_MACH_MACH_TIME_H
 
@@ -298,8 +262,8 @@
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
-/* define if you have mode_t data type */
-#undef HAVE_MODE_T
+/* M_DATA is defined in sys/stream.h included by netinet/in.h */
+#undef HAVE_M_DATA
 
 /* Define to 1 if you have the <ndir.h> header file. */
 #undef HAVE_NDIR_H
@@ -332,8 +296,8 @@
 /* Define to 1 if you have the `pidfile' function. */
 #undef HAVE_PIDFILE
 
-/* define if you have pid_t data type */
-#undef HAVE_PID_T
+/* Define to 1 if you have the `pledge' function. */
+#undef HAVE_PLEDGE
 
 /* Define if you have /proc/$pid/fd */
 #undef HAVE_PROC_PID
@@ -344,11 +308,11 @@
 /* Define to 1 if you have the `reallocarray' function. */
 #undef HAVE_REALLOCARRAY
 
-/* define if you have sa_family_t data type */
-#undef HAVE_SA_FAMILY_T
+/* Define if you have the res_9_b64_ntop() function. */
+#undef HAVE_RES_9_B64_NTOP
 
-/* Define to 1 if you have the `scan_scaled' function. */
-#undef HAVE_SCAN_SCALED
+/* Define to 1 if the system has the type `sa_family_t'. */
+#undef HAVE_SA_FAMILY_T
 
 /* Define to 1 if you have the <security/pam_appl.h> header file. */
 #undef HAVE_SECURITY_PAM_APPL_H
@@ -377,6 +341,9 @@
 /* Define to 1 if you have the `setsid' function. */
 #undef HAVE_SETSID
 
+/* Define if you have the setsockopt() function. */
+#undef HAVE_SETSOCKOPT
+
 /* Define to 1 if you have the <shadow.h> header file. */
 #undef HAVE_SHADOW_H
 
@@ -386,8 +353,8 @@
 /* Define to 1 if the system has the type `sig_atomic_t'. */
 #undef HAVE_SIG_ATOMIC_T
 
-/* define if you have size_t data type */
-#undef HAVE_SIZE_T
+/* Define to 1 if you have the `snprintf' function. */
+#undef HAVE_SNPRINTF
 
 /* Define to 1 if you have the `socketpair' function. */
 #undef HAVE_SOCKETPAIR
@@ -395,11 +362,11 @@
 /* Have PEERCRED socket option */
 #undef HAVE_SO_PEERCRED
 
-/* define if you have ssize_t data type */
-#undef HAVE_SSIZE_T
+/* Define if SSL library support SSL_CTX_set_dh_auto */
+#undef HAVE_SSL_CTX_SET_DH_AUTO
 
-/* Fields in struct sockaddr_storage */
-#undef HAVE_SS_FAMILY_IN_SS
+/* Define if SSL library support SSL_CTX_set_ecdh_auto */
+#undef HAVE_SSL_CTX_SET_ECDH_AUTO
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
@@ -412,9 +379,6 @@
 
 /* Define to 1 if you have the `strerror' function. */
 #undef HAVE_STRERROR
-
-/* Silly mkstemp() */
-#undef HAVE_STRICT_MKSTEMP
 
 /* Define to 1 if you have the <strings.h> header file. */
 #undef HAVE_STRINGS_H
@@ -440,13 +404,13 @@
 /* Define to 1 if you have the `strtonum' function. */
 #undef HAVE_STRTONUM
 
-/* define if you have struct addrinfo data type */
+/* Define to 1 if the system has the type `struct addrinfo'. */
 #undef HAVE_STRUCT_ADDRINFO
 
 /* Define to 1 if the system has the type `struct ifgroupreq'. */
 #undef HAVE_STRUCT_IFGROUPREQ
 
-/* define if you have struct in6_addr data type */
+/* Define to 1 if the system has the type `struct in6_addr'. */
 #undef HAVE_STRUCT_IN6_ADDR
 
 /* Define to 1 if `pw_change' is a member of `struct passwd'. */
@@ -461,7 +425,7 @@
 /* Define to 1 if `pw_gecos' is a member of `struct passwd'. */
 #undef HAVE_STRUCT_PASSWD_PW_GECOS
 
-/* define if you have struct sockaddr_in6 data type */
+/* Define to 1 if the system has the type `struct sockaddr_in6'. */
 #undef HAVE_STRUCT_SOCKADDR_IN6
 
 /* Define to 1 if `sin6_len' is a member of `struct sockaddr_in6'. */
@@ -476,11 +440,17 @@
 /* Define to 1 if `sa_len' is a member of `struct sockaddr'. */
 #undef HAVE_STRUCT_SOCKADDR_SA_LEN
 
-/* define if you have struct sockaddr_storage data type */
+/* Define to 1 if the system has the type `struct sockaddr_storage'. */
 #undef HAVE_STRUCT_SOCKADDR_STORAGE
+
+/* Define to 1 if `ss_family' is a member of `struct sockaddr_storage'. */
+#undef HAVE_STRUCT_SOCKADDR_STORAGE_SS_FAMILY
 
 /* Define to 1 if `ss_len' is a member of `struct sockaddr_storage'. */
 #undef HAVE_STRUCT_SOCKADDR_STORAGE_SS_LEN
+
+/* Define to 1 if `__ss_family' is a member of `struct sockaddr_storage'. */
+#undef HAVE_STRUCT_SOCKADDR_STORAGE___SS_FAMILY
 
 /* Define to 1 if `f_favail' is a member of `struct statfs'. */
 #undef HAVE_STRUCT_STATFS_F_FAVAIL
@@ -497,7 +467,7 @@
 /* Define to 1 if the system has the type `struct timespec'. */
 #undef HAVE_STRUCT_TIMESPEC
 
-/* define if you have struct timeval */
+/* Define to 1 if the system has the type `struct timeval'. */
 #undef HAVE_STRUCT_TIMEVAL
 
 /* Define to 1 if you have the `sysconf' function. */
@@ -557,8 +527,8 @@
 /* Define to 1 if the system has the type `uintmax_t'. */
 #undef HAVE_UINTMAX_T
 
-/* define if you have uintxx_t data type */
-#undef HAVE_UINTXX_T
+/* Define to 1 if the system has the type `uintptr_t'. */
+#undef HAVE_UINTPTR_T
 
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
@@ -566,26 +536,23 @@
 /* Define to 1 if the system has the type `unsigned long long'. */
 #undef HAVE_UNSIGNED_LONG_LONG
 
+/* Define to 1 if the system has the type `unsigned long long int'. */
+#undef HAVE_UNSIGNED_LONG_LONG_INT
+
 /* Define to 1 if you have the <util.h> header file. */
 #undef HAVE_UTIL_H
 
-/* Define to 1 if you have the `utimes' function. */
+/* Define if you have the utimes() function. */
 #undef HAVE_UTIMES
 
 /* Define to 1 if you have the <utime.h> header file. */
 #undef HAVE_UTIME_H
 
-/* define if you have u_char data type */
+/* Define to 1 if the system has the type `u_char'. */
 #undef HAVE_U_CHAR
 
-/* define if you have u_int data type */
+/* Define to 1 if the system has the type `u_int'. */
 #undef HAVE_U_INT
-
-/* define if you have u_int64_t data type */
-#undef HAVE_U_INT64_T
-
-/* define if you have u_intxx_t data type */
-#undef HAVE_U_INTXX_T
 
 /* Define to 1 if you have the `vasprintf' function. */
 #undef HAVE_VASPRINTF
@@ -613,9 +580,6 @@
 
 /* Define if libc defines __progname */
 #undef HAVE___PROGNAME
-
-/* Fields in struct sockaddr_storage */
-#undef HAVE___SS_FAMILY_IN_SS
 
 /* Define if __va_copy exists */
 #undef HAVE___VA_COPY
@@ -666,13 +630,7 @@
 /* Specify location of spooler */
 #undef PATH_SPOOL
 
-/* Defined to 0 if RES_USE_DNSSEC isn't a supported resolver flag. */
-#undef RES_USE_DNSSEC
-
-/* Defined to 0 if RES_USE_EDNS0 isn't a supported resolver flag. */
-#undef RES_USE_EDNS0
-
-/* Define if your platform breaks doing a seteuid before a setuid */
+/* define if seteuid breaks setuid */
 #undef SETEUID_BREAKS_SETUID
 
 /* The size of `int', as computed by sizeof. */
@@ -687,6 +645,9 @@
 /* The size of `short int', as computed by sizeof. */
 #undef SIZEOF_SHORT_INT
 
+/* non-privileged group for queue process */
+#undef SMTPD_QUEUE_GROUP
+
 /* non-privileged user for queue process */
 #undef SMTPD_QUEUE_USER
 
@@ -695,9 +656,6 @@
 
 /* non-privileged user for privilege separation */
 #undef SMTPD_USER
-
-/* Define as const if snprintf() can declare const char *fmt */
-#undef SNPRINTF_CONST
 
 /* Define to a Set Process Title type if your system is supported by
    bsd-setproctitle.c */
@@ -718,9 +676,6 @@
 /* Version number of package */
 #undef VERSION
 
-/* use libcrypto for cryptography */
-#undef WITH_OPENSSL
-
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
 #if defined AC_APPLE_UNIVERSAL_BUILD
@@ -733,8 +688,23 @@
 # endif
 #endif
 
-/* Define if we don't have struct __res_state in resolv.h */
-#undef __res_state
+/* Define for Solaris 2.5.1 so the uint32_t typedef from <sys/synch.h>,
+   <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the
+   #define below would cause a syntax error. */
+#undef _UINT32_T
+
+/* Define for Solaris 2.5.1 so the uint64_t typedef from <sys/synch.h>,
+   <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the
+   #define below would cause a syntax error. */
+#undef _UINT64_T
+
+/* Define for Solaris 2.5.1 so the uint8_t typedef from <sys/synch.h>,
+   <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the
+   #define below would cause a syntax error. */
+#undef _UINT8_T
+
+/* Define to `int' if <sys/types.h> doesn't define. */
+#undef gid_t
 
 /* Define to `__inline__' or `__inline' if that's what the C compiler
    calls it, or to nothing if 'inline' is not supported under any name.  */
@@ -742,5 +712,71 @@
 #undef inline
 #endif
 
+/* Define to the type of a signed integer type of width exactly 16 bits if
+   such a type exists and the standard includes do not define it. */
+#undef int16_t
+
+/* Define to the type of a signed integer type of width exactly 32 bits if
+   such a type exists and the standard includes do not define it. */
+#undef int32_t
+
+/* Define to the type of a signed integer type of width exactly 64 bits if
+   such a type exists and the standard includes do not define it. */
+#undef int64_t
+
+/* Define to the type of a signed integer type of width exactly 8 bits if such
+   a type exists and the standard includes do not define it. */
+#undef int8_t
+
+/* Define to the widest signed integer type if <stdint.h> and <inttypes.h> do
+   not define. */
+#undef intmax_t
+
+/* Define to the type of a signed integer type wide enough to hold a pointer,
+   if such a type exists, and if the system does not define it. */
+#undef intptr_t
+
+/* Define to `int' if <sys/types.h> does not define. */
+#undef mode_t
+
+/* Define to `long int' if <sys/types.h> does not define. */
+#undef off_t
+
+/* Define to `int' if <sys/types.h> does not define. */
+#undef pid_t
+
+/* Define to `unsigned int' if <sys/types.h> does not define. */
+#undef size_t
+
 /* type to use in place of socklen_t if not defined */
 #undef socklen_t
+
+/* Define to `int' if <sys/types.h> does not define. */
+#undef ssize_t
+
+/* Define to `int' if <sys/types.h> doesn't define. */
+#undef uid_t
+
+/* Define to the type of an unsigned integer type of width exactly 16 bits if
+   such a type exists and the standard includes do not define it. */
+#undef uint16_t
+
+/* Define to the type of an unsigned integer type of width exactly 32 bits if
+   such a type exists and the standard includes do not define it. */
+#undef uint32_t
+
+/* Define to the type of an unsigned integer type of width exactly 64 bits if
+   such a type exists and the standard includes do not define it. */
+#undef uint64_t
+
+/* Define to the type of an unsigned integer type of width exactly 8 bits if
+   such a type exists and the standard includes do not define it. */
+#undef uint8_t
+
+/* Define to the widest unsigned integer type if <stdint.h> and <inttypes.h>
+   do not define. */
+#undef uintmax_t
+
+/* Define to the type of an unsigned integer type wide enough to hold a
+   pointer, if such a type exists, and if the system does not define it. */
+#undef uintptr_t

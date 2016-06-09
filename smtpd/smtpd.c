@@ -1,4 +1,4 @@
-/*	$OpenBSD: smtpd.c,v 1.221 2014/04/19 14:00:45 gilles Exp $	*/
+/*	$OpenBSD: smtpd.c,v 1.274 2016/02/05 19:15:15 jung Exp $	*/
 
 /*
  * Copyright (c) 2008 Gilles Chehade <gilles@poolp.org>
@@ -50,15 +50,17 @@
 #include <errno.h>
 #include <event.h>
 #include <fcntl.h>
-#include <fts.h>
 #include <grp.h> /* needed for setgroups */
+#include <fts.h>
 #include <imsg.h>
 #include <inttypes.h>
 #include <libgen.h>
 #ifdef HAVE_LOGIN_CAP_H
 #include <login_cap.h>
 #endif
+#ifdef HAVE_PATHS_H
 #include <paths.h>
+#endif
 #include <pwd.h>
 #include <signal.h>
 #ifdef HAVE_SHADOW_H
@@ -187,6 +189,7 @@ parent_imsg(struct mproc *p, struct imsg *imsg)
 	if (p->proc == PROC_LKA) {
 		switch (imsg->hdr.type) {
 		case IMSG_LKA_OPEN_FORWARD:
+			CHECK_IMSG_DATA_SIZE(imsg, sizeof *fwreq);
 			fwreq = imsg->data;
 			fd = parent_forward_open(fwreq->user, fwreq->directory,
 			    fwreq->uid, fwreq->gid);
@@ -362,20 +365,14 @@ parent_sig_handler(int sig, short event, void *p)
 
 	switch (sig) {
 	case SIGTERM:
-		log_info("info: received signal SIGTERM, shutting down");
-		break;
 	case SIGINT:
-		log_info("info: received signal SIGINT, shutting down");
-		break;
-	}
-
-	switch (sig) {
-	case SIGTERM:
-	case SIGINT:
+		log_info("info: %s, shutting down", strsignal(sig));
 		die_gracefully = 1;
 		/* FALLTHROUGH */
 	case SIGCHLD:
 		do {
+			int len;
+
 			pid = waitpid(-1, &status, WNOHANG);
 			if (pid <= 0)
 				continue;
@@ -383,17 +380,21 @@ parent_sig_handler(int sig, short event, void *p)
 			fail = 0;
 			if (WIFSIGNALED(status)) {
 				fail = 1;
-				asprintf(&cause, "terminated; signal %d",
+				len = asprintf(&cause, "terminated; signal %d",
 				    WTERMSIG(status));
 			} else if (WIFEXITED(status)) {
 				if (WEXITSTATUS(status) != 0) {
 					fail = 1;
-					asprintf(&cause, "exited abnormally");
+					len = asprintf(&cause,
+					    "exited abnormally");
 				} else
-					asprintf(&cause, "exited okay");
+					len = asprintf(&cause, "exited okay");
 			} else
 				/* WIFSTOPPED or WIFCONTINUED */
 				continue;
+
+			if (len == -1)
+				fatal("asprintf");
 
 			if (pid == purge_pid)
 				purge_pid = -1;
@@ -413,8 +414,12 @@ parent_sig_handler(int sig, short event, void *p)
 			case CHILD_MDA:
 				if (WIFSIGNALED(status) &&
 				    WTERMSIG(status) == SIGALRM) {
-					free(cause);
-					asprintf(&cause, "terminated; timeout");
+					char *tmp;
+					if (asprintf(&tmp,
+					    "terminated; timeout") != -1) {
+						free(cause);
+						cause = tmp;
+					}
 				}
 				else if (child->cause &&
 				    WIFSIGNALED(status) &&
@@ -423,8 +428,7 @@ parent_sig_handler(int sig, short event, void *p)
 					cause = child->cause;
 					child->cause = NULL;
 				}
-				if (child->cause)
-					free(child->cause);
+				free(child->cause);
 				log_debug("debug: smtpd: mda process done "
 				    "for session %016"PRIx64 ": %s",
 				    child->mda_id, cause);
@@ -442,10 +446,8 @@ parent_sig_handler(int sig, short event, void *p)
 					    "couldn't enqueue offline "
 					    "message %s; smtpctl %s",
 					    child->path, cause);
-				else {
+				else
 					unlink(child->path);
-					rmdir(dirname(child->path));
-				}
 				free(child->path);
 				offline_done();
 				break;
@@ -532,7 +534,7 @@ main(int argc, char *argv[])
 				    optarg);
 			break;
 		case 'h':
-			log_info("version: OpenSMTPD " SMTPD_VERSION);
+			log_info("version: " SMTPD_NAME " " SMTPD_VERSION);
 			usage();
 			break;
 		case 'n':
@@ -545,7 +547,7 @@ main(int argc, char *argv[])
 		case 'F':
 			foreground = 1;
 			break;
-			
+
 		case 'T':
 			if (!strcmp(optarg, "imsg"))
 				verbose |= TRACE_IMSG;
@@ -630,9 +632,11 @@ main(int argc, char *argv[])
 
 	if (env->sc_opts & SMTPD_OPT_NOACTION) {
 #ifdef HAVE_GCM_CRYPTO
-		if (env->sc_queue_key) {
-			if (! crypto_setup(env->sc_queue_key, strlen(env->sc_queue_key)))
-				fatalx("crypto_setup: invalid key for queue encryption");
+		if (env->sc_queue_key &&
+		    crypto_setup(env->sc_queue_key,
+		    strlen(env->sc_queue_key)) == 0) {
+			fatalx("crypto_setup:"
+			    "invalid key for queue encryption");
 		}
 #endif
 		load_pki_tree();
@@ -671,26 +675,16 @@ main(int argc, char *argv[])
 				err(1, "strdup");
 		}
 		else {
-			char   *buf;
-			char   *lbuf;
-			size_t	len;
+			char   *buf = NULL;
+			size_t	sz = 0;
+			ssize_t	len;
 
 			if (strcasecmp(env->sc_queue_key, "stdin") == 0) {
-				lbuf = NULL;
-				buf = fgetln(stdin, &len);
-				if (buf[len - 1] == '\n') {
-					lbuf = calloc(len, 1);
-					if (lbuf == NULL)
-						err(1, "calloc");
-					memcpy(lbuf, buf, len-1);
-				}
-				else {
-					lbuf = calloc(len+1, 1);
-					if (lbuf == NULL)
-						err(1, "calloc");
-					memcpy(lbuf, buf, len);
-				}
-				env->sc_queue_key = lbuf;
+				if ((len = getline(&buf, &sz, stdin)) == -1)
+					err(1, "getline");
+				if (buf[len - 1] == '\n')
+					buf[len - 1] = '\0';
+				env->sc_queue_key = buf;
 			}
 		}
 	}
@@ -702,10 +696,11 @@ main(int argc, char *argv[])
 	log_verbose(verbose);
 
 	load_pki_tree();
+	load_pki_keys();
 
 	log_info("info: %s %s starting", SMTPD_NAME, SMTPD_VERSION);
 
-	if (! foreground)
+	if (!foreground)
 		if (daemon(0, 0) == -1)
 			err(1, "failed to daemonize");
 
@@ -719,15 +714,12 @@ main(int argc, char *argv[])
 	log_debug("debug: using \"%s\" queue backend", backend_queue);
 	log_debug("debug: using \"%s\" scheduler backend", backend_scheduler);
 	log_debug("debug: using \"%s\" stat backend", backend_stat);
-	log_info("info: startup%s", (verbose & TRACE_DEBUG)?" [debug mode]":"");
 
 	if (env->sc_hostname[0] == '\0')
 		errx(1, "machine does not have a hostname set");
 	env->sc_uptime = time(NULL);
 
 	fork_peers();
-
-	config_process(PROC_PARENT);
 
 	imsg_callback = parent_imsg;
 	event_init();
@@ -762,8 +754,11 @@ main(int argc, char *argv[])
 	if (pidfile(NULL) < 0)
 		err(1, "pidfile");
 
-	log_debug("libevent %s (%s)", event_get_version(), event_get_method());
 	purge_task();
+
+	if (pledge("stdio rpath wpath cpath fattr flock tmppath "
+	    "getpw sendfd proc exec id inet unix", NULL) == -1)
+		err(1, "pledge");
 
 	if (event_dispatch() < 0)
 		fatal("smtpd: event_dispatch");
@@ -787,10 +782,12 @@ load_pki_tree(void)
 			fatalx("load_pki_tree: missing certificate file");
 		if (pki->pki_key_file == NULL)
 			fatalx("load_pki_tree: missing key file");
-		if (! ssl_load_certificate(pki, pki->pki_cert_file))
+
+		if (!ssl_load_certificate(pki, pki->pki_cert_file))
 			fatalx("load_pki_tree: failed to load certificate file");
+
 		if (pki->pki_dhparams_file)
-			if (! ssl_load_dhparams(pki, pki->pki_dhparams_file))
+			if (!ssl_load_dhparams(pki, pki->pki_dhparams_file))
 				fatalx("load_pki_tree: failed to load dhparams file");
 	}
 
@@ -798,7 +795,7 @@ load_pki_tree(void)
 	iter_dict = NULL;
 	while (dict_iter(env->sc_ca_dict, &iter_dict, &k, (void **)&sca)) {
 		log_debug("info: loading CA information for %s", k);
-		if (! ssl_load_cafile(sca, sca->ca_cert_file))
+		if (!ssl_load_cafile(sca, sca->ca_cert_file))
 			fatalx("load_pki_tree: failed to load CA file");
 	}
 }
@@ -814,7 +811,8 @@ load_pki_keys(void)
 	iter_dict = NULL;
 	while (dict_iter(env->sc_pki_dict, &iter_dict, &k, (void **)&pki)) {
 		log_debug("info: loading pki keys for %s", k);
-		if (! ssl_load_keyfile(pki, pki->pki_key_file, k))
+
+		if (!ssl_load_keyfile(pki, pki->pki_key_file, k))
 			fatalx("load_pki_keys: failed to load key file");
 	}
 }
@@ -838,16 +836,15 @@ fork_peers(void)
 void
 post_fork(int proc)
 {
-	if (proc != PROC_QUEUE && env->sc_queue_key)
+	if (proc != PROC_QUEUE && env->sc_queue_key) {
 		explicit_bzero(env->sc_queue_key, strlen(env->sc_queue_key));
+		if (strcasecmp(env->sc_queue_key, "stdin") != 0)
+			free(env->sc_queue_key);
+	}
 
 	if (proc != PROC_CONTROL) {
 		close(control_socket);
 		control_socket = -1;
-	}
-
-	if (proc == PROC_CA) {
-		load_pki_keys();
 	}
 }
 
@@ -974,7 +971,6 @@ forkmda(struct mproc *p, uint64_t id, struct deliver *deliver)
 	struct child	*child;
 	pid_t		 pid;
 	int		 allout, pipefd[2];
-	mode_t		 omode;
 
 	log_debug("debug: smtpd: forking mda for session %016"PRIx64
 	    ": \"%s\" as %s", id, deliver->to, deliver->user);
@@ -989,7 +985,7 @@ forkmda(struct mproc *p, uint64_t id, struct deliver *deliver)
 		return;
 	}
 
-	if (deliver->userinfo.uid == 0 && ! db->allow_root) {
+	if (deliver->userinfo.uid == 0 && !db->allow_root) {
 		(void)snprintf(ebuf, sizeof ebuf, "not allowed to deliver to: %s",
 		    deliver->user);
 		m_create(p_pony, IMSG_MDA_DONE, 0, 0, -1);
@@ -1010,9 +1006,7 @@ forkmda(struct mproc *p, uint64_t id, struct deliver *deliver)
 
 	/* prepare file which captures stdout and stderr */
 	(void)strlcpy(sfn, "/tmp/smtpd.out.XXXXXXXXXXX", sizeof(sfn));
-	omode = umask(7077);
 	allout = mkstemp(sfn);
-	umask(omode);
 	if (allout < 0) {
 		(void)snprintf(ebuf, sizeof ebuf, "mkstemp: %s", strerror(errno));
 		m_create(p_pony, IMSG_MDA_DONE, 0, 0, -1);
@@ -1100,15 +1094,21 @@ offline_scan(int fd, short ev, void *arg)
 		if (e->fts_info != FTS_F)
 			continue;
 
-		/* offline files must be at depth 2 */
-		if (e->fts_level != 2)
+		/* offline files must be at depth 1 */
+		if (e->fts_level != 1)
 			continue;
 
-		/* offline file owner must match parent directory owner */
-		if (e->fts_statp->st_uid != e->fts_parent->fts_statp->st_uid)
+		/* offline file group must match parent directory group */
+		if (e->fts_statp->st_gid != e->fts_parent->fts_statp->st_gid)
 			continue;
 
-		if (offline_add(e->fts_accpath)) {
+		if (e->fts_statp->st_size == 0) {
+			if (unlink(e->fts_accpath) == -1)
+				log_warnx("warn: smtpd: could not unlink %s", e->fts_accpath);
+			continue;
+		}
+
+		if (offline_add(e->fts_name)) {
 			log_warnx("warn: smtpd: "
 			    "could not add offline message %s", e->fts_name);
 			continue;
@@ -1135,9 +1135,17 @@ offline_enqueue(char *name)
 	pid_t		 pid;
 	struct child	*child;
 	struct passwd	*pw;
+	int		 pathlen;
 
-	if ((path = strdup(name)) == NULL) {
-		log_warn("warn: smtpd: strdup");
+	pathlen = asprintf(&path, "%s/%s", PATH_SPOOL PATH_OFFLINE, name);
+	if (pathlen == -1) {
+		log_warnx("warn: smtpd: asprintf");
+		return (-1);
+	}
+
+	if (pathlen >= PATH_MAX) {
+		log_warnx("warn: smtpd: pathname exceeds PATH_MAX");
+		free(path);
 		return (-1);
 	}
 
@@ -1150,14 +1158,15 @@ offline_enqueue(char *name)
 	}
 
 	if (pid == 0) {
-		char	*envp[2], *p, *tmp;
+		char	*envp[2], *p = NULL, *tmp;
 		int	 fd;
 		FILE	*fp;
-		size_t	 len;
+		size_t	 sz = 0;
+		ssize_t	 len;
 		arglist	 args;
 
-		(void)closefrom(STDERR_FILENO + 1);
-		
+		closefrom(STDERR_FILENO + 1);
+
 		memset(&args, 0, sizeof(args));
 
 		if ((fd = open(path, O_RDONLY|O_NOFOLLOW|O_NONBLOCK)) == -1) {
@@ -1170,7 +1179,7 @@ offline_enqueue(char *name)
 			_exit(1);
 		}
 
-		if (! S_ISREG(sb.st_mode)) {
+		if (!S_ISREG(sb.st_mode)) {
 			log_warnx("warn: smtpd: file %s (uid %d) not regular",
 			    path, sb.st_uid);
 			_exit(1);
@@ -1188,17 +1197,12 @@ offline_enqueue(char *name)
 			_exit(1);
 		}
 
-#ifdef HAVE_FCHFLAGS
-		if (fchflags(fd, 0) == -1) {
-			log_warn("warn: smtpd: chflags: %s", path);
-			_exit(1);
-		}
-#endif
-
 		if (setgroups(1, &pw->pw_gid) ||
 		    setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) ||
 		    setresuid(pw->pw_uid, pw->pw_uid, pw->pw_uid))
 			_exit(1);
+
+		closefrom(STDERR_FILENO + 1);
 
 		if ((fp = fdopen(fd, "r")) == NULL)
 			_exit(1);
@@ -1211,7 +1215,7 @@ offline_enqueue(char *name)
 		    dup2(fileno(fp), STDIN_FILENO) == -1)
 			_exit(1);
 
-		if ((p = fgetln(fp, &len)) == NULL)
+		if ((len = getline(&p, &sz, fp)) == -1)
 			_exit(1);
 
 		if (p[len - 1] != '\n')
@@ -1224,6 +1228,7 @@ offline_enqueue(char *name)
 		while ((tmp = strsep(&p, "|")) != NULL)
 			addargs(&args, "%s", tmp);
 
+		free(p);
 		if (lseek(fileno(fp), len, SEEK_SET) == -1)
 			_exit(1);
 
@@ -1284,7 +1289,7 @@ parent_forward_open(char *username, char *directory, uid_t uid, gid_t gid)
 	int		fd;
 	struct stat	sb;
 
-	if (! bsnprintf(pathname, sizeof (pathname), "%s/.forward",
+	if (!bsnprintf(pathname, sizeof (pathname), "%s/.forward",
 		directory)) {
 		log_warnx("warn: smtpd: %s: pathname too large", pathname);
 		return -1;
@@ -1319,7 +1324,7 @@ parent_forward_open(char *username, char *directory, uid_t uid, gid_t gid)
 		return -1;
 	}
 
-	if (! secure_file(fd, pathname, directory, uid, 1)) {
+	if (!secure_file(fd, pathname, directory, uid, 1)) {
 		log_warnx("warn: smtpd: %s: unsecure file", pathname);
 		close(fd);
 		return -1;
@@ -1333,7 +1338,6 @@ imsg_dispatch(struct mproc *p, struct imsg *imsg)
 {
 	struct timespec	t0, t1, dt;
 	int		msg;
-	int		profile = profiling & PROFILE_IMSG;
 
 	if (imsg == NULL) {
 		exit(1);
@@ -1342,13 +1346,13 @@ imsg_dispatch(struct mproc *p, struct imsg *imsg)
 
 	log_imsg(smtpd_process, p->proc, imsg);
 
-	if (profile)
+	if (profiling & PROFILE_IMSG)
 		clock_gettime(CLOCK_MONOTONIC, &t0);
 
 	msg = imsg->hdr.type;
 	imsg_callback(p, imsg);
 
-	if (profile) {
+	if (profiling & PROFILE_IMSG) {
 		clock_gettime(CLOCK_MONOTONIC, &t1);
 		timespecsub(&t1, &t0, &dt);
 
@@ -1366,7 +1370,7 @@ imsg_dispatch(struct mproc *p, struct imsg *imsg)
 			if (smtpd_process == PROC_CONTROL)
 				return;
 
-			if (! bsnprintf(key, sizeof key,
+			if (!bsnprintf(key, sizeof key,
 				"profiling.imsg.%s.%s.%s",
 				proc_name(smtpd_process),
 				proc_name(p->proc),
@@ -1382,10 +1386,6 @@ log_imsg(int to, int from, struct imsg *imsg)
 {
 
 	if (to == PROC_CONTROL && imsg->hdr.type == IMSG_STAT_SET)
-		return;
-
-	if (imsg->hdr.type == IMSG_STAT_INCREMENT ||
-	    imsg->hdr.type == IMSG_STAT_DECREMENT)
 		return;
 
 	if (imsg->fd != -1)

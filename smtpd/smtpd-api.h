@@ -1,4 +1,4 @@
-/*	$OpenBSD$	*/
+/*	$OpenBSD: smtpd-api.h,v 1.29 2016/02/09 22:18:17 gilles Exp $	*/
 
 /*
  * Copyright (c) 2013 Eric Faurot <eric@openbsd.org>
@@ -107,6 +107,7 @@ enum {
 	PROC_QUEUE_MESSAGE_COMMIT,
 	PROC_QUEUE_MESSAGE_FD_R,
 	PROC_QUEUE_MESSAGE_CORRUPT,
+	PROC_QUEUE_MESSAGE_UNCORRUPT,
 	PROC_QUEUE_ENVELOPE_CREATE,
 	PROC_QUEUE_ENVELOPE_DELETE,
 	PROC_QUEUE_ENVELOPE_LOAD,
@@ -199,7 +200,7 @@ enum table_service {
 	K_SOURCE	= 0x020,	/* returns struct source	*/
 	K_MAILADDR	= 0x040,	/* returns struct mailaddr	*/
 	K_ADDRNAME	= 0x080,	/* returns struct addrname	*/
-	K_MAILADDRMAP	= 0x100,	/* returns struct mailaddr	*/
+	K_MAILADDRMAP	= 0x100,	/* returns struct maddrmap	*/
 };
 #define K_ANY		  0xfff
 
@@ -255,7 +256,7 @@ enum enhanced_status_code {
 	ESC_DELIVERY_TIME_EXPIRED   	      	    	= 47,
 
 	/* 5.x */
-	ESC_INVALID_RECIPIENT				= 50,
+	ESC_INVALID_RECIPIENT   	      	    	= 50,
 	ESC_INVALID_COMMAND	   	      	    	= 51,
 	ESC_SYNTAX_ERROR	   	      	    	= 52,
 	ESC_TOO_MANY_RECIPIENTS	   	      	    	= 53,

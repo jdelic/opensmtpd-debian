@@ -1,4 +1,4 @@
-/*	$OpenBSD$	*/
+/*	$OpenBSD: scheduler.c,v 1.51 2015/12/28 22:08:30 jung Exp $	*/
 
 /*
  * Copyright (c) 2008 Gilles Chehade <gilles@poolp.org>
@@ -158,7 +158,7 @@ scheduler_imsg(struct mproc *p, struct imsg *imsg)
 		    "scheduler: queue requested removal of evp:%016" PRIx64,
 		    evpid);
 		stat_decrement("scheduler.envelope", 1);
-		if (! inflight)
+		if (!inflight)
 			backend->remove(evpid);
 		else {
 			backend->delete(evpid);
@@ -500,6 +500,10 @@ scheduler(void)
 
 	evtimer_set(&ev, scheduler_timeout, NULL);
 	scheduler_reset_events();
+
+	if (pledge("stdio", NULL) == -1)
+		err(1, "pledge");
+
 	if (event_dispatch() < 0)
 		fatal("event_dispatch");
 	scheduler_shutdown();

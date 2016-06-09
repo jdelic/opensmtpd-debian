@@ -1,4 +1,4 @@
-/*	$OpenBSD: ioev.c,v 1.19 2014/07/08 07:59:31 sobrado Exp $	*/
+/*	$OpenBSD: ioev.c,v 1.24 2015/12/28 22:08:30 jung Exp $	*/
 /*
  * Copyright (c) 2012 Eric Faurot <eric@openbsd.org>
  *
@@ -91,7 +91,7 @@ io_strio(struct io *io)
 #ifdef IO_SSL
 	if (io->ssl) {
 		(void)snprintf(ssl, sizeof ssl, " ssl=%s:%s:%d",
-		    SSL_get_cipher_version(io->ssl),
+		    SSL_get_version(io->ssl),
 		    SSL_get_cipher_name(io->ssl),
 		    SSL_get_cipher_bits(io->ssl, NULL));
 	}
@@ -895,11 +895,12 @@ io_reload_ssl(struct io *io)
 			ev = EV_READ;
 			dispatch = io_dispatch_read_ssl;
 		}
-		else if (IO_WRITING(io) && !(io->flags & IO_PAUSE_OUT) && io_queued(io)) {
+		else if (IO_WRITING(io) && !(io->flags & IO_PAUSE_OUT) &&
+		    io_queued(io)) {
 			ev = EV_WRITE;
 			dispatch = io_dispatch_write_ssl;
 		}
-		if (! ev)
+		if (!ev)
 			return; /* paused */
 		break;
 	default:

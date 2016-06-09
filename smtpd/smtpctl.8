@@ -1,4 +1,4 @@
-.\" $OpenBSD: smtpctl.8,v 1.48 2014/07/08 07:58:01 sobrado Exp $
+.\" $OpenBSD: smtpctl.8,v 1.54 2015/11/05 09:14:31 sunil Exp $
 .\"
 .\" Copyright (c) 2006 Pierre-Yves Ritschard <pyr@openbsd.org>
 .\" Copyright (c) 2012 Gilles Chehade <gilles@poolp.org>
@@ -15,25 +15,33 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: July 8 2014 $
+.Dd $Mdocdate: November 5 2015 $
 .Dt SMTPCTL 8
 .Os
 .Sh NAME
-.Nm smtpctl
+.Nm smtpctl ,
+.Nm mailq
 .Nd control the Simple Mail Transfer Protocol daemon
 .Sh SYNOPSIS
 .Nm
 .Ar command
 .Op Ar argument ...
+.Nm mailq
 .Sh DESCRIPTION
 The
 .Nm
 program controls
 .Xr smtpd 8 .
 Commands may be abbreviated to the minimum unambiguous prefix; for example,
-.Cm sh s
+.Cm sh ro
 for
-.Cm show stats .
+.Cm show routes .
+.Pp
+The
+.Nm mailq
+command is provided for compatibility with other MTAs
+and is simply a shortcut for
+.Cm show queue .
 .Pp
 The following commands are available:
 .Bl -tag -width Ds
@@ -99,6 +107,8 @@ Generated bounces.
 .It Cm pause envelope Ar envelope-id | message-id
 Temporarily suspend scheduling for the envelope with the given ID,
 or all envelopes with the given message ID.
+.It Cm pause envelope all
+Temporarily suspend scheduling all the envelopes.
 .It Cm pause mda
 Temporarily stop deliveries to local users.
 .It Cm pause mta
@@ -119,9 +129,13 @@ imsg, to profile cost of event handlers
 .El
 .It Cm remove Ar envelope-id | message-id
 Remove a single envelope, or all envelopes with the same message ID.
+.It Cm remove all
+Remove all envelopes.
 .It Cm resume envelope Ar envelope-id | message-id
 Resume scheduling for the envelope with the given ID,
 or all envelopes with the given message ID.
+.It Cm resume envelope all
+Resume scheduling all the envelopes.
 .It Cm resume mda
 Resume deliveries to local users.
 .It Cm resume mta
@@ -246,7 +260,7 @@ io
 .It
 smtp (incoming sessions)
 .It
-filters
+filter
 .It
 transfer (outgoing sessions)
 .It
@@ -306,7 +320,7 @@ a command which specifies an
 applies to a specific recipient of a message.
 .Sh FILES
 .Bl -tag -width "/var/run/smtpd.sockXXX" -compact
-.It /var/run/smtpd.sock
+.It Pa /var/run/smtpd.sock
 .Ux Ns -domain
 socket used for communication with
 .Xr smtpd 8 .

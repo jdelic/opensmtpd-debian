@@ -1,4 +1,4 @@
-/*	$OpenBSD$	*/
+/*	$OpenBSD: parse.y,v 1.183 2016/02/22 16:19:05 gilles Exp $	*/
 
 /*
  * Copyright (c) 2008 Gilles Chehade <gilles@poolp.org>
@@ -45,7 +45,9 @@
 #include <inttypes.h>
 #include <limits.h>
 #include <netdb.h>
+#ifdef HAVE_PATHS_H
 #include <paths.h>
+#endif
 #include <pwd.h>
 #include <stdarg.h>
 #include <resolv.h>
@@ -83,7 +85,7 @@ int		 lgetc(int);
 int		 lungetc(int);
 int		 findeol(void);
 int		 yyerror(const char *, ...)
-    __attribute__ ((format (printf, 1, 2)))
+    __attribute__((__format__ (printf, 1, 2)))
     __attribute__((__nonnull__ (1)));
 
 TAILQ_HEAD(symhead, sym)	 symhead = TAILQ_HEAD_INITIALIZER(symhead);
@@ -103,29 +105,26 @@ static int		 errors = 0;
 struct filter_conf	*filter = NULL;
 struct table		*table = NULL;
 struct rule		*rule = NULL;
-struct listener		 l;
 struct mta_limits	*limits;
 static struct pki	*pki;
 static struct ca	*sca;
 
 enum listen_options {
-	LO_FAMILY		= 0x000001,
-	LO_PORT			= 0x000002,
-	LO_SSL			= 0x000004,
-	LO_FILTER		= 0x000008,
-	LO_PKI			= 0x000010,
-	LO_AUTH			= 0x000020,
-	LO_TAG			= 0x000040,
-	LO_HOSTNAME		= 0x000080,
-	LO_HOSTNAMES		= 0x000100,
-	LO_MASKSOURCE		= 0x000200,
-	LO_NODSN		= 0x000400,
-	LO_SENDERS		= 0x000800,
-	LO_RECEIVEDAUTH		= 0x001000,
-	LO_MASQUERADE		= 0x002000,
-	LO_DSNNOTIFY_DISABLE	= 0x004000,
-	LO_DSNRET_HEADERS	= 0x008000,
-	LO_CA			= 0x010000,
+	LO_FAMILY	= 0x000001,
+	LO_PORT		= 0x000002,
+	LO_SSL		= 0x000004,
+	LO_FILTER      	= 0x000008,
+	LO_PKI      	= 0x000010,
+	LO_AUTH      	= 0x000020,
+	LO_TAG      	= 0x000040,
+	LO_HOSTNAME   	= 0x000080,
+	LO_HOSTNAMES   	= 0x000100,
+	LO_MASKSOURCE  	= 0x000200,
+	LO_NODSN	= 0x000400,
+	LO_SENDERS	= 0x000800,
+	LO_RECEIVEDAUTH = 0x001000,
+	LO_MASQUERADE	= 0x002000,
+	LO_CA		= 0x010000
 };
 
 static struct listen_opts {
@@ -147,8 +146,9 @@ static struct listen_opts {
 	uint32_t       	options;
 } listen_opts;
 
-static void	create_listener(struct listenerlist *,  struct listen_opts *);
-static void	config_listener(struct listener *,  struct listen_opts *);
+static struct listener	*create_sock_listener(struct listen_opts *);
+static void		 create_if_listener(struct listenerlist *,  struct listen_opts *);
+static void		 config_listener(struct listener *,  struct listen_opts *);
 
 struct listener	*host_v4(const char *, in_port_t);
 struct listener	*host_v6(const char *, in_port_t);
@@ -163,6 +163,9 @@ int		 is_if_in_group(const char *, const char *);
 static struct filter_conf *create_filter_proc(char *, char *);
 static struct filter_conf *create_filter_chain(char *);
 static int add_filter_arg(struct filter_conf *, char *);
+
+static int config_lo_filter(struct listen_opts *, char *);
+static int config_lo_mask_source(struct listen_opts *);
 
 typedef struct {
 	union {
@@ -179,11 +182,11 @@ typedef struct {
 
 %token	AS QUEUE COMPRESSION ENCRYPTION MAXMESSAGESIZE MAXMTADEFERRED LISTEN ON ANY PORT EXPIRE
 %token	TABLE SECURE SMTPS CERTIFICATE DOMAIN BOUNCEWARN LIMIT INET4 INET6 NODSN SESSION
-%token  RELAY BACKUP VIA DELIVER TO LMTP MAILDIR MBOX HOSTNAME HOSTNAMES
+%token  RELAY BACKUP VIA DELIVER TO LMTP MAILDIR MBOX RCPTTO HOSTNAME HOSTNAMES
 %token	ACCEPT REJECT INCLUDE ERROR MDA FROM FOR SOURCE MTA PKI SCHEDULER
 %token	ARROW AUTH TLS LOCAL VIRTUAL TAG TAGGED ALIAS FILTER KEY CA DHPARAMS
 %token	AUTH_OPTIONAL TLS_REQUIRE USERBASE SENDER SENDERS MASK_SOURCE VERIFY FORWARDONLY RECIPIENT
-%token	CIPHERS CURVE RECEIVEDAUTH MASQUERADE DSNNOTIFY DISABLE DSNRET HEADERS ENQUEUER
+%token	CIPHERS RECEIVEDAUTH MASQUERADE SOCKET
 %token	<v.string>	STRING
 %token  <v.number>	NUMBER
 %type	<v.table>	table
@@ -411,10 +414,22 @@ pki		: opt_pki pki
 		| /* empty */
 		;
 
-opt_listen     	: INET4			{
+opt_sock_listen : FILTER STRING {
+			if (config_lo_filter(&listen_opts, $2)) {
+				YYERROR;
+			}
+		}
+		| MASK_SOURCE {
+			if (config_lo_mask_source(&listen_opts)) {
+				YYERROR;
+			}
+		}
+		;
+
+opt_if_listen : INET4 {
 			if (listen_opts.options & LO_FAMILY) {
 				yyerror("address family already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_FAMILY;
 			listen_opts.family = AF_INET;
@@ -422,7 +437,7 @@ opt_listen     	: INET4			{
 		| INET6			{
 			if (listen_opts.options & LO_FAMILY) {
 				yyerror("address family already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_FAMILY;
 			listen_opts.family = AF_INET6;
@@ -432,7 +447,7 @@ opt_listen     	: INET4			{
 
 			if (listen_opts.options & LO_PORT) {
 				yyerror("port already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_PORT;
 
@@ -448,7 +463,7 @@ opt_listen     	: INET4			{
 		| PORT NUMBER			{
 			if (listen_opts.options & LO_PORT) {
 				yyerror("port already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_PORT;
 
@@ -459,17 +474,14 @@ opt_listen     	: INET4			{
 			listen_opts.port = $2;
 		}
 		| FILTER STRING			{
-			if (listen_opts.options & LO_FILTER) {
-				yyerror("filter already specified");
-				YYERROR;	
+			if (config_lo_filter(&listen_opts, $2)) {
+				YYERROR;
 			}
-			listen_opts.options |= LO_FILTER;
-			listen_opts.filtername = $2;
 		}
 		| SMTPS				{
 			if (listen_opts.options & LO_SSL) {
 				yyerror("TLS mode already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_SSL;
 			listen_opts.ssl = F_SMTPS;
@@ -477,7 +489,7 @@ opt_listen     	: INET4			{
 		| SMTPS VERIFY 			{
 			if (listen_opts.options & LO_SSL) {
 				yyerror("TLS mode already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_SSL;
 			listen_opts.ssl = F_SMTPS|F_TLS_VERIFY;
@@ -485,7 +497,7 @@ opt_listen     	: INET4			{
 		| TLS				{
 			if (listen_opts.options & LO_SSL) {
 				yyerror("TLS mode already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_SSL;
 			listen_opts.ssl = F_STARTTLS;
@@ -493,7 +505,7 @@ opt_listen     	: INET4			{
 		| SECURE       			{
 			if (listen_opts.options & LO_SSL) {
 				yyerror("TLS mode already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_SSL;
 			listen_opts.ssl = F_SSL;
@@ -501,7 +513,7 @@ opt_listen     	: INET4			{
 		| TLS_REQUIRE			{
 			if (listen_opts.options & LO_SSL) {
 				yyerror("TLS mode already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_SSL;
 			listen_opts.ssl = F_STARTTLS|F_STARTTLS_REQUIRE;
@@ -509,7 +521,7 @@ opt_listen     	: INET4			{
 		| TLS_REQUIRE VERIFY   		{
 			if (listen_opts.options & LO_SSL) {
 				yyerror("TLS mode already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_SSL;
 			listen_opts.ssl = F_STARTTLS|F_STARTTLS_REQUIRE|F_TLS_VERIFY;
@@ -517,7 +529,7 @@ opt_listen     	: INET4			{
 		| PKI STRING			{
 			if (listen_opts.options & LO_PKI) {
 				yyerror("pki already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_PKI;
 			listen_opts.pki = $2;
@@ -533,7 +545,7 @@ opt_listen     	: INET4			{
 		| AUTH				{
 			if (listen_opts.options & LO_AUTH) {
 				yyerror("auth already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_AUTH;
 			listen_opts.auth = F_AUTH|F_AUTH_REQUIRE;
@@ -541,7 +553,7 @@ opt_listen     	: INET4			{
 		| AUTH_OPTIONAL			{
 			if (listen_opts.options & LO_AUTH) {
 				yyerror("auth already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_AUTH;
 			listen_opts.auth = F_AUTH;
@@ -549,7 +561,7 @@ opt_listen     	: INET4			{
 		| AUTH tables  			{
 			if (listen_opts.options & LO_AUTH) {
 				yyerror("auth already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_AUTH;
 			listen_opts.authtable = $2;
@@ -558,7 +570,7 @@ opt_listen     	: INET4			{
 		| AUTH_OPTIONAL tables 		{
 			if (listen_opts.options & LO_AUTH) {
 				yyerror("auth already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_AUTH;
 			listen_opts.authtable = $2;
@@ -567,11 +579,11 @@ opt_listen     	: INET4			{
 		| TAG STRING			{
 			if (listen_opts.options & LO_TAG) {
 				yyerror("tag already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_TAG;
 
-       			if (strlen($2) >= SMTPD_TAG_SIZE) {
+			if (strlen($2) >= SMTPD_TAG_SIZE) {
        				yyerror("tag name too long");
 				free($2);
 				YYERROR;
@@ -581,7 +593,7 @@ opt_listen     	: INET4			{
 		| HOSTNAME STRING	{
 			if (listen_opts.options & LO_HOSTNAME) {
 				yyerror("hostname already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_HOSTNAME;
 
@@ -592,11 +604,11 @@ opt_listen     	: INET4			{
 
 			if (listen_opts.options & LO_HOSTNAMES) {
 				yyerror("hostnames already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_HOSTNAMES;
 
-			if (! table_check_use(t, T_DYNAMIC|T_HASH, K_ADDRNAME)) {
+			if (!table_check_use(t, T_DYNAMIC|T_HASH, K_ADDRNAME)) {
 				yyerror("invalid use of table \"%s\" as "
 				    "HOSTNAMES parameter", t->t_name);
 				YYERROR;
@@ -604,17 +616,14 @@ opt_listen     	: INET4			{
 			listen_opts.hostnametable = t;
 		}
 		| MASK_SOURCE	{
-			if (listen_opts.options & LO_MASKSOURCE) {
-				yyerror("mask-source already specified");
-				YYERROR;	
+			if (config_lo_mask_source(&listen_opts)) {
+				YYERROR;
 			}
-			listen_opts.options |= LO_MASKSOURCE;
-			listen_opts.flags |= F_MASK_SOURCE;
 		}
-		| RECEIVEDAUTH {
+		| RECEIVEDAUTH	{
 			if (listen_opts.options & LO_RECEIVEDAUTH) {
 				yyerror("received-auth already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_RECEIVEDAUTH;
 			listen_opts.flags |= F_RECEIVEDAUTH;
@@ -622,34 +631,10 @@ opt_listen     	: INET4			{
 		| NODSN	{
 			if (listen_opts.options & LO_NODSN) {
 				yyerror("no-dsn already specified");
-				YYERROR;	
+				YYERROR;
 			}
 			listen_opts.options |= LO_NODSN;
 			listen_opts.flags &= ~F_EXT_DSN;
-		}
-		| DSNNOTIFY DISABLE {
-			if (listen_opts.options & LO_DSNRET_HEADERS) {
-				yyerror("dsn-notify used in ambiguous context");
-				YYERROR;
-			}
-			if (listen_opts.options & LO_DSNNOTIFY_DISABLE) {
-				yyerror("dsn-notify already specified");
-				YYERROR;
-			}
-			listen_opts.options |= LO_DSNNOTIFY_DISABLE;
-			listen_opts.flags |= F_DSNNOTIFY_DISABLE;
-		}
-		| DSNRET HEADERS {
-			if (listen_opts.options & LO_DSNNOTIFY_DISABLE) {
-				yyerror("dsn-ret used in ambiguous context");
-				YYERROR;
-			}
-			if (listen_opts.options & LO_DSNRET_HEADERS) {
-				yyerror("dsn-ret already specified");
-				YYERROR;
-			}
-			listen_opts.options |= LO_DSNRET_HEADERS;
-			listen_opts.flags |= F_DSNRET_HEADERS;
 		}
 		| SENDERS tables	{
 			struct table	*t = $2;
@@ -660,7 +645,7 @@ opt_listen     	: INET4			{
 			}
 			listen_opts.options |= LO_SENDERS;
 
-			if (! table_check_use(t, T_DYNAMIC|T_HASH, K_MAILADDRMAP)) {
+			if (!table_check_use(t, T_DYNAMIC|T_HASH, K_MAILADDRMAP)) {
 				yyerror("invalid use of table \"%s\" as "
 				    "SENDERS parameter", t->t_name);
 				YYERROR;
@@ -676,7 +661,7 @@ opt_listen     	: INET4			{
 			}
 			listen_opts.options |= LO_SENDERS|LO_MASQUERADE;
 
-			if (! table_check_use(t, T_DYNAMIC|T_HASH, K_MAILADDRMAP)) {
+			if (!table_check_use(t, T_DYNAMIC|T_HASH, K_MAILADDRMAP)) {
 				yyerror("invalid use of table \"%s\" as "
 				    "SENDERS parameter", t->t_name);
 				YYERROR;
@@ -685,14 +670,37 @@ opt_listen     	: INET4			{
 		}
 		;
 
-listen		: opt_listen listen
+listener_type	: socket_listener
+		| if_listener
+		;
+
+socket_listener	: SOCKET sock_listen {
+			if (conf->sc_sock_listener) {
+				yyerror("socket listener already configured");
+				YYERROR;
+			}
+			conf->sc_sock_listener = create_sock_listener(&listen_opts);
+		}
+		;
+
+if_listener	: STRING if_listen {
+			listen_opts.ifx = $1;
+			create_if_listener(conf->sc_listeners, &listen_opts);
+		}
+		;
+
+sock_listen	: opt_sock_listen sock_listen
+		| /* empty */
+		;
+
+if_listen	: opt_if_listen if_listen
 		| /* empty */
 		;
 
 opt_relay_common: AS STRING	{
 			struct mailaddr maddr, *maddrp;
 
-			if (! text_to_mailaddr(&maddr, $2)) {
+			if (!text_to_mailaddr(&maddr, $2)) {
 				yyerror("invalid parameter to AS: %s", $2);
 				free($2);
 				YYERROR;
@@ -716,7 +724,7 @@ opt_relay_common: AS STRING	{
 		}
 		| SOURCE tables			{
 			struct table	*t = $2;
-			if (! table_check_use(t, T_DYNAMIC|T_LIST, K_SOURCE)) {
+			if (!table_check_use(t, T_DYNAMIC|T_LIST, K_SOURCE)) {
 				yyerror("invalid use of table \"%s\" as "
 				    "SOURCE parameter", t->t_name);
 				YYERROR;
@@ -731,7 +739,7 @@ opt_relay_common: AS STRING	{
 		}
 		| HOSTNAMES tables		{
 			struct table	*t = $2;
-			if (! table_check_use(t, T_DYNAMIC|T_HASH, K_ADDRNAME)) {
+			if (!table_check_use(t, T_DYNAMIC|T_HASH, K_ADDRNAME)) {
 				yyerror("invalid use of table \"%s\" as "
 				    "HOSTNAMES parameter", t->t_name);
 				YYERROR;
@@ -740,14 +748,14 @@ opt_relay_common: AS STRING	{
 			    sizeof rule->r_value.relayhost.helotable);
 		}
 		| PKI STRING {
-			if (! lowercase(rule->r_value.relayhost.pki_name, $2,
+			if (!lowercase(rule->r_value.relayhost.pki_name, $2,
 				sizeof(rule->r_value.relayhost.pki_name))) {
 				yyerror("pki name too long: %s", $2);
 				free($2);
 				YYERROR;
 			}
 			if (dict_get(conf->sc_pki_dict,
-			    rule->r_value.relayhost.pki_name) == NULL) {
+				rule->r_value.relayhost.pki_name) == NULL) {
 				log_warnx("pki name not found: %s", $2);
 				free($2);
 				YYERROR;
@@ -755,14 +763,14 @@ opt_relay_common: AS STRING	{
 			free($2);
 		}
 		| CA STRING {
-			if (! lowercase(rule->r_value.relayhost.ca_name, $2,
+			if (!lowercase(rule->r_value.relayhost.ca_name, $2,
 				sizeof(rule->r_value.relayhost.ca_name))) {
 				yyerror("ca name too long: %s", $2);
 				free($2);
 				YYERROR;
 			}
 			if (dict_get(conf->sc_ca_dict,
-			    rule->r_value.relayhost.ca_name) == NULL) {
+				rule->r_value.relayhost.ca_name) == NULL) {
 				log_warnx("ca name not found: %s", $2);
 				free($2);
 				YYERROR;
@@ -804,7 +812,7 @@ relay		: opt_relay_common relay
 opt_relay_via	: AUTH tables {
 			struct table   *t = $2;
 
-			if (! table_check_use(t, T_DYNAMIC|T_HASH, K_CREDENTIALS)) {
+			if (!table_check_use(t, T_DYNAMIC|T_HASH, K_CREDENTIALS)) {
 				yyerror("invalid use of table \"%s\" as AUTH parameter",
 				    t->t_name);
 				YYERROR;
@@ -878,28 +886,10 @@ main		: BOUNCEWARN {
 		} limits_mta
 		| LIMIT SCHEDULER limits_scheduler
 		| LISTEN {
-			memset(&l, 0, sizeof l);
 			memset(&listen_opts, 0, sizeof listen_opts);
 			listen_opts.family = AF_UNSPEC;
 			listen_opts.flags |= F_EXT_DSN;
-		} ON STRING listen {
-			listen_opts.ifx = $4;
-			create_listener(conf->sc_listeners, &listen_opts);
-		}
-		| ENQUEUER FILTER STRING {
-			if (dict_get(&conf->sc_filters, $3) == NULL) {
-				yyerror("undefined filter \"%s\"", $3);
-				free($3);
-				YYERROR;
-			}
-			if (strlcpy(conf->sc_enqueue_filter, $3,
-				sizeof conf->sc_enqueue_filter)
-			    >= sizeof conf->sc_enqueue_filter) {
-				free($3);
-				YYERROR;
-			}
-			free($3);
-		}
+		} ON listener_type
 		| FILTER STRING STRING {
 			if (!strcmp($3, "chain")) {
 				free($3);
@@ -921,7 +911,7 @@ main		: BOUNCEWARN {
 
 			/* if not catchall, check that it is a valid domain */
 			if (strcmp($2, "*") != 0) {
-				if (! res_hnok($2)) {
+				if (!res_hnok($2)) {
 					yyerror("not a valid domain name: %s", $2);
 					free($2);
 					YYERROR;
@@ -941,7 +931,7 @@ main		: BOUNCEWARN {
 
 			/* if not catchall, check that it is a valid domain */
 			if (strcmp($2, "*") != 0) {
-				if (! res_hnok($2)) {
+				if (!res_hnok($2)) {
 					yyerror("not a valid domain name: %s", $2);
 					free($2);
 					YYERROR;
@@ -958,9 +948,6 @@ main		: BOUNCEWARN {
 		} ca
 		| CIPHERS STRING {
 			env->sc_tls_ciphers = $2;
-		}
-		| CURVE STRING {
-			env->sc_tls_curve = $2;
 		}
 		;
 
@@ -1083,7 +1070,7 @@ tables		: tablenew			{ $$ = $1; }
 alias		: ALIAS tables			{
 			struct table   *t = $2;
 
-			if (! table_check_use(t, T_DYNAMIC|T_HASH, K_ALIAS)) {
+			if (!table_check_use(t, T_DYNAMIC|T_HASH, K_ALIAS)) {
 				yyerror("invalid use of table \"%s\" as ALIAS parameter",
 				    t->t_name);
 				YYERROR;
@@ -1096,7 +1083,7 @@ alias		: ALIAS tables			{
 virtual		: VIRTUAL tables		{
 			struct table   *t = $2;
 
-			if (! table_check_use(t, T_DYNAMIC|T_HASH, K_ALIAS)) {
+			if (!table_check_use(t, T_DYNAMIC|T_HASH, K_ALIAS)) {
 				yyerror("invalid use of table \"%s\" as VIRTUAL parameter",
 				    t->t_name);
 				YYERROR;
@@ -1130,7 +1117,7 @@ userbase	: USERBASE tables	{
 				yyerror("userbase specified multiple times");
 				YYERROR;
 			}
-			if (! table_check_use(t, T_DYNAMIC|T_HASH, K_USERINFO)) {
+			if (!table_check_use(t, T_DYNAMIC|T_HASH, K_USERINFO)) {
 				yyerror("invalid use of table \"%s\" as USERBASE parameter",
 				    t->t_name);
 				YYERROR;
@@ -1139,13 +1126,14 @@ userbase	: USERBASE tables	{
 		}
 		;
 
-deliver_as	: AS STRING		{
-			if (strlcpy(rule->r_delivery_user, $2, sizeof(rule->r_delivery_user))
+deliver_as	: AS STRING	{
+			if (strlcpy(rule->r_delivery_user, $2,
+			    sizeof(rule->r_delivery_user))
 			    >= sizeof(rule->r_delivery_user))
 				fatal("username too long");
 			free($2);
 		}
-		| /* empty */		{ }
+		| /* empty */	{}
 		;
 
 deliver_action	: DELIVER TO MAILDIR			{
@@ -1181,7 +1169,22 @@ deliver_action	: DELIVER TO MAILDIR			{
 				fatal("invalid lmtp destination");
 			free($4);
 		}
-		| DELIVER TO MDA STRING deliver_as   	{
+		| DELIVER TO LMTP STRING RCPTTO deliver_as 	{
+			rule->r_action = A_LMTP;
+			if (strchr($4, ':') || $4[0] == '/') {
+				if (strlcpy(rule->r_value.buffer, $4,
+					sizeof(rule->r_value.buffer))
+					>= sizeof(rule->r_value.buffer))
+					fatal("lmtp destination too long");
+				if (strlcat(rule->r_value.buffer, " rcpt-to",
+					sizeof(rule->r_value.buffer))
+					>= sizeof(rule->r_value.buffer))
+					fatal("lmtp recipient too long");
+			} else
+				fatal("invalid lmtp destination");
+			free($4);
+		}
+		| DELIVER TO MDA STRING deliver_as	{
 			rule->r_action = A_MDA;
 			if (strlcpy(rule->r_value.buffer, $4,
 			    sizeof(rule->r_value.buffer))
@@ -1196,7 +1199,7 @@ relay_action   	: RELAY relay {
 		}
 		| RELAY VIA STRING {
 			rule->r_action = A_RELAYVIA;
-			if (! text_to_relayhost(&rule->r_value.relayhost, $3)) {
+			if (!text_to_relayhost(&rule->r_value.relayhost, $3)) {
 				yyerror("error: invalid url: %s", $3);
 				free($3);
 				YYERROR;
@@ -1224,7 +1227,7 @@ from		: FROM negation SOURCE tables       		{
 				yyerror("from specified multiple times");
 				YYERROR;
 			}
-			if (! table_check_use(t, T_DYNAMIC|T_LIST, K_NETADDR)) {
+			if (!table_check_use(t, T_DYNAMIC|T_LIST, K_NETADDR)) {
 				yyerror("invalid use of table \"%s\" as FROM parameter",
 				    t->t_name);
 				YYERROR;
@@ -1257,7 +1260,7 @@ for		: FOR negation DOMAIN tables {
 				yyerror("for specified multiple times");
 				YYERROR;
 			}
-			if (! table_check_use(t, T_DYNAMIC|T_LIST, K_DOMAIN)) {
+			if (!table_check_use(t, T_DYNAMIC|T_LIST, K_DOMAIN)) {
 				yyerror("invalid use of table \"%s\" as DOMAIN parameter",
 				    t->t_name);
 				YYERROR;
@@ -1291,7 +1294,7 @@ sender		: SENDER negation tables			{
 				YYERROR;
 			}
 
-			if (! table_check_use(t, T_DYNAMIC|T_LIST, K_MAILADDR)) {
+			if (!table_check_use(t, T_DYNAMIC|T_LIST, K_MAILADDR)) {
 				yyerror("invalid use of table \"%s\" as SENDER parameter",
 				    t->t_name);
 				YYERROR;
@@ -1309,7 +1312,7 @@ recipient      	: RECIPIENT negation tables			{
 				YYERROR;
 			}
 
-			if (! table_check_use(t, T_DYNAMIC|T_LIST, K_MAILADDR)) {
+			if (!table_check_use(t, T_DYNAMIC|T_LIST, K_MAILADDR)) {
 				yyerror("invalid use of table \"%s\" as RECIPIENT parameter",
 				    t->t_name);
 				YYERROR;
@@ -1380,11 +1383,11 @@ rule		: ACCEPT {
 			rule->r_desttype = DEST_DOM;
 			rule->r_qexpire = -1;
 		} decision lookup action accept_params {
-			if (! rule->r_sources)
-				rule->r_sources = table_find("<localhost>", NULL);			
-			if (! rule->r_destination)
+			if (!rule->r_sources)
+				rule->r_sources = table_find("<localhost>", NULL);
+			if (!rule->r_destination)
 			 	rule->r_destination = table_find("<localnames>", NULL);
-			if (! rule->r_userbase)
+			if (!rule->r_userbase)
 				rule->r_userbase = table_find("<getpwnam>", NULL);
 			if (rule->r_qexpire == -1)
 				rule->r_qexpire = conf->sc_qexpire;
@@ -1410,9 +1413,9 @@ rule		: ACCEPT {
 			rule->r_decision = R_REJECT;
 			rule->r_desttype = DEST_DOM;
 		} decision {
-			if (! rule->r_sources)
+			if (!rule->r_sources)
 				rule->r_sources = table_find("<localhost>", NULL);
-			if (! rule->r_destination)
+			if (!rule->r_destination)
 				rule->r_destination = table_find("<localnames>", NULL);
 			TAILQ_INSERT_TAIL(conf->sc_rules, rule, r_entry);
 			rule = NULL;
@@ -1428,8 +1431,8 @@ struct keywords {
 int
 yyerror(const char *fmt, ...)
 {
-	va_list ap;
-	char*msg;
+	va_list		 ap;
+	char		*msg;
 
 	file->errors++;
 	va_start(ap, fmt);
@@ -1464,21 +1467,15 @@ lookup(char *s)
 		{ "certificate",	CERTIFICATE },
 		{ "ciphers",		CIPHERS },
 		{ "compression",	COMPRESSION },
-		{ "curve",		CURVE },
 		{ "deliver",		DELIVER },
 		{ "dhparams",		DHPARAMS },
-		{ "disable",		DISABLE },
 		{ "domain",		DOMAIN },
-		{ "dsn-notify",		DSNNOTIFY },
-		{ "dsn-ret",		DSNRET },
 		{ "encryption",		ENCRYPTION },
-		{ "enqueuer",		ENQUEUER },
 		{ "expire",		EXPIRE },
 		{ "filter",		FILTER },
 		{ "for",		FOR },
 		{ "forward-only",      	FORWARDONLY },
 		{ "from",		FROM },
-		{ "headers",		HEADERS },
 		{ "hostname",		HOSTNAME },
 		{ "hostnames",		HOSTNAMES },
 		{ "include",		INCLUDE },
@@ -1502,6 +1499,7 @@ lookup(char *s)
 		{ "pki",		PKI },
 		{ "port",		PORT },
 		{ "queue",		QUEUE },
+		{ "rcpt-to",		RCPTTO },
 		{ "received-auth",     	RECEIVEDAUTH },
 		{ "recipient",		RECIPIENT },
 		{ "reject",		REJECT },
@@ -1512,6 +1510,7 @@ lookup(char *s)
 		{ "senders",   		SENDERS },
 		{ "session",   		SESSION },
 		{ "smtps",		SMTPS },
+		{ "socket",		SOCKET },
 		{ "source",		SOURCE },
 		{ "table",		TABLE },
 		{ "tag",		TAG },
@@ -1537,10 +1536,10 @@ lookup(char *s)
 
 #define MAXPUSHBACK	128
 
-u_char	*parsebuf;
-int	 parseindex;
-u_char	 pushback_buffer[MAXPUSHBACK];
-int	 pushback_index = 0;
+unsigned char	*parsebuf;
+int		 parseindex;
+unsigned char	 pushback_buffer[MAXPUSHBACK];
+int		 pushback_index = 0;
 
 int
 lgetc(int quotec)
@@ -1630,10 +1629,10 @@ findeol(void)
 int
 yylex(void)
 {
-	u_char	 buf[8096];
-	u_char	*p, *val;
-	int	 quotec, next, c;
-	int	 token;
+	unsigned char	 buf[8096];
+	unsigned char	*p, *val;
+	int		 quotec, next, c;
+	int		 token;
 
 top:
 	p = buf;
@@ -1858,7 +1857,7 @@ parse_config(struct smtpd *x_conf, const char *filename, int opts)
 	char		hostname[HOST_NAME_MAX+1];
 	char		hostname_copy[HOST_NAME_MAX+1];
 
-	if (! getmailname(hostname, sizeof hostname))
+	if (getmailname(hostname, sizeof hostname) == -1)
 		return (-1);
 
 	conf = x_conf;
@@ -1968,6 +1967,12 @@ parse_config(struct smtpd *x_conf, const char *filename, int opts)
 	popfile();
 	endservent();
 
+	/* If the socket listener was not configured, create a default one. */
+	if (!conf->sc_sock_listener) {
+		memset(&listen_opts, 0, sizeof listen_opts);
+		conf->sc_sock_listener = create_sock_listener(&listen_opts);
+	}
+
 	/* Free macros and check which have not been used. */
 	for (sym = TAILQ_FIRST(&symhead); sym != NULL; sym = next) {
 		next = TAILQ_NEXT(sym, entry);
@@ -2069,17 +2074,32 @@ symget(const char *nam)
 	return (NULL);
 }
 
+static struct listener *
+create_sock_listener(struct listen_opts *lo)
+{
+	struct listener *l = xcalloc(1, sizeof(*l), "create_sock_listener");
+	lo->tag = "local";
+	lo->hostname = conf->sc_hostname;
+	l->ss.ss_family = AF_LOCAL;
+#ifdef HAVE_STRUCT_SOCKADDR_STORAGE_SS_LEN
+	l->ss.ss_len = sizeof(struct sockaddr *);
+#endif
+	config_listener(l, lo);
+
+	return (l);
+}
+
 static void
-create_listener(struct listenerlist *ll,  struct listen_opts *lo)
+create_if_listener(struct listenerlist *ll,  struct listen_opts *lo)
 {
 	uint16_t	flags;
 
 	if (lo->port != 0 && lo->ssl == F_SSL)
 		errx(1, "invalid listen option: tls/smtps on same port");
-	
+
 	if (lo->auth != 0 && !lo->ssl)
 		errx(1, "invalid listen option: auth requires tls/smtps");
-	
+
 	if (lo->pki && !lo->ssl)
 		errx(1, "invalid listen option: pki requires tls/smtps");
 
@@ -2088,7 +2108,7 @@ create_listener(struct listenerlist *ll,  struct listen_opts *lo)
 	if (lo->port) {
 		lo->flags = lo->ssl|lo->auth|flags;
 		lo->port = htons(lo->port);
-		if (! interface(ll, lo))
+		if (!interface(ll, lo))
 			if (host(ll, lo) <= 0)
 				errx(1, "invalid virtual ip or interface: %s", lo->ifx);
 	}
@@ -2096,17 +2116,17 @@ create_listener(struct listenerlist *ll,  struct listen_opts *lo)
 		if (lo->ssl & F_SMTPS) {
 			lo->port = htons(465);
 			lo->flags = F_SMTPS|lo->auth|flags;
-			if (! interface(ll, lo))
+			if (!interface(ll, lo))
 				if (host(ll, lo) <= 0)
 					errx(1, "invalid virtual ip or interface: %s", lo->ifx);
 		}
 
-		if (! lo->ssl || (lo->ssl & F_STARTTLS)) {
+		if (!lo->ssl || (lo->ssl & F_STARTTLS)) {
 			lo->port = htons(25);
 			lo->flags = lo->auth|flags;
 			if (lo->ssl & F_STARTTLS)
 				lo->flags |= F_STARTTLS;
-			if (! interface(ll, lo))
+			if (!interface(ll, lo))
 				if (host(ll, lo) <= 0)
 					errx(1, "invalid virtual ip or interface: %s", lo->ifx);
 		}
@@ -2136,7 +2156,7 @@ config_listener(struct listener *h,  struct listen_opts *lo)
 	if (lo->authtable != NULL)
 		(void)strlcpy(h->authtable, lo->authtable->t_name, sizeof(h->authtable));
 	if (lo->pki != NULL) {
-		if (! lowercase(h->pki_name, lo->pki, sizeof(h->pki_name))) {
+		if (!lowercase(h->pki_name, lo->pki, sizeof(h->pki_name))) {
 			log_warnx("pki name too long: %s", lo->pki);
 			fatalx(NULL);
 		}
@@ -2145,8 +2165,9 @@ config_listener(struct listener *h,  struct listen_opts *lo)
 			fatalx(NULL);
 		}
 	}
+
 	if (lo->ca != NULL) {
-		if (! lowercase(h->ca_name, lo->ca, sizeof(h->ca_name))) {
+		if (!lowercase(h->ca_name, lo->ca, sizeof(h->ca_name))) {
 			log_warnx("ca name too long: %s", lo->ca);
 			fatalx(NULL);
 		}
@@ -2191,6 +2212,9 @@ host_v4(const char *s, in_port_t port)
 	sain->sin_addr.s_addr = ina.s_addr;
 	sain->sin_port = port;
 
+	if (sain->sin_addr.s_addr == htonl(INADDR_LOOPBACK))
+		h->local = 1;
+
 	return (h);
 }
 
@@ -2213,6 +2237,9 @@ host_v6(const char *s, in_port_t port)
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_port = port;
 	memcpy(&sin6->sin6_addr, &ina6, sizeof(ina6));
+
+	if (IN6_IS_ADDR_LOOPBACK(&sin6->sin6_addr))
+		h->local = 1;
 
 	return (h);
 }
@@ -2254,6 +2281,8 @@ host_dns(struct listenerlist *al, struct listen_opts *lo)
 			sain->sin_addr.s_addr = ((struct sockaddr_in *)
 			    res->ai_addr)->sin_addr.s_addr;
 			sain->sin_port = lo->port;
+			if (sain->sin_addr.s_addr == htonl(INADDR_LOOPBACK))
+				h->local = 1;
 		} else {
 			sin6 = (struct sockaddr_in6 *)&h->ss;
 #ifdef HAVE_STRUCT_SOCKADDR_IN6_SIN6_LEN
@@ -2262,6 +2291,8 @@ host_dns(struct listenerlist *al, struct listen_opts *lo)
 			memcpy(&sin6->sin6_addr, &((struct sockaddr_in6 *)
 			    res->ai_addr)->sin6_addr, sizeof(struct in6_addr));
 			sin6->sin6_port = lo->port;
+			if (IN6_IS_ADDR_LOOPBACK(&sin6->sin6_addr))
+				h->local = 1;
 		}
 
 		config_listener(h, lo);
@@ -2310,7 +2341,7 @@ interface(struct listenerlist *al, struct listen_opts *lo)
 		if (p->ifa_addr == NULL)
 			continue;
 		if (strcmp(p->ifa_name, lo->ifx) != 0 &&
-		    ! is_if_in_group(p->ifa_name, lo->ifx))
+		    !is_if_in_group(p->ifa_name, lo->ifx))
 			continue;
 		if (lo->family != AF_UNSPEC && lo->family != p->ifa_addr->sa_family)
 			continue;
@@ -2325,6 +2356,8 @@ interface(struct listenerlist *al, struct listen_opts *lo)
 			sain->sin_len = sizeof(struct sockaddr_in);
 #endif
 			sain->sin_port = lo->port;
+			if (sain->sin_addr.s_addr == htonl(INADDR_LOOPBACK))
+				h->local = 1;
 			break;
 
 		case AF_INET6:
@@ -2334,6 +2367,8 @@ interface(struct listenerlist *al, struct listen_opts *lo)
 			sin6->sin6_len = sizeof(struct sockaddr_in6);
 #endif
 			sin6->sin6_port = lo->port;
+			if (IN6_IS_ADDR_LOOPBACK(&sin6->sin6_addr))
+				h->local = 1;
 			break;
 
 		default:
@@ -2427,41 +2462,41 @@ delaytonum(char *str)
 	size_t           len;
 	const char      *errstr = NULL;
 	int              delay;
-  	
+
 	/* we need at least 1 digit and 1 unit */
 	len = strlen(str);
 	if (len < 2)
 		goto bad;
-	
+
 	switch(str[len - 1]) {
-		
+
 	case 's':
 		factor = 1;
 		break;
-		
+
 	case 'm':
 		factor = 60;
 		break;
-		
+
 	case 'h':
 		factor = 60 * 60;
 		break;
-		
+
 	case 'd':
 		factor = 24 * 60 * 60;
 		break;
-		
+
 	default:
 		goto bad;
 	}
-  	
+
 	str[len - 1] = '\0';
 	delay = strtonum(str, 1, INT_MAX / factor, &errstr);
 	if (errstr)
 		goto bad;
-	
+
 	return (delay * factor);
-  	
+
 bad:
 	return (-1);
 }
@@ -2490,12 +2525,11 @@ is_if_in_group(const char *ifname, const char *groupname)
         }
 
         len = ifgr.ifgr_len;
-        ifgr.ifgr_groups =
-            (struct ifg_req *)xcalloc(len/sizeof(struct ifg_req),
+        ifgr.ifgr_groups = xcalloc(len/sizeof(struct ifg_req),
 		sizeof(struct ifg_req), "is_if_in_group");
         if (ioctl(s, SIOCGIFGROUP, (caddr_t)&ifgr) == -1)
                 err(1, "SIOCGIFGROUP");
-	
+
         ifg = ifgr.ifgr_groups;
         for (; ifg && len >= sizeof(struct ifg_req); ifg++) {
                 len -= sizeof(struct ifg_req);
@@ -2589,3 +2623,28 @@ add_filter_arg(struct filter_conf *f, char *arg)
 
 	return (1);
 }
+
+static int
+config_lo_filter(struct listen_opts *lo, char *filter_name) {
+	if (lo->options & LO_FILTER) {
+		yyerror("filter already specified");
+		return -1;
+	}
+	lo->options |= LO_FILTER;
+	lo->filtername = filter_name;
+
+	return 0;
+}
+
+static int
+config_lo_mask_source(struct listen_opts *lo) {
+	if (lo->options & LO_MASKSOURCE) {
+		yyerror("mask-source already specified");
+		return -1;
+	}
+	lo->options |= LO_MASKSOURCE;
+	lo->flags |= F_MASK_SOURCE;
+
+	return 0;
+}
+

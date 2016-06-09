@@ -1,4 +1,4 @@
-/*	$OpenBSD: smtpctl.c,v 1.124 2014/07/20 01:38:40 guenther Exp $	*/
+/*	$OpenBSD: smtpctl.c,v 1.149 2016/04/29 08:55:08 eric Exp $	*/
 
 /*
  * Copyright (c) 2013 Eric Faurot <eric@openbsd.org>
@@ -29,6 +29,7 @@
 #include <sys/tree.h>
 #include <sys/un.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 #include <net/if.h>
 /* #include <net/if_media.h> */
@@ -63,7 +64,13 @@
 #define PATH_ENCRYPT	"/usr/bin/encrypt"
 #endif
 
+#ifndef HAVE_DB_API
+#define	makemap(x, y)	1
+#endif
+
+
 int srv_connect(void);
+int srv_connected(void);
 
 void usage(void);
 static void show_queue_envelope(struct envelope *, int);
@@ -76,6 +83,8 @@ static int is_gzip_fp(FILE *);
 static int is_encrypted_fp(FILE *);
 static int is_encrypted_buffer(const char *);
 static int is_gzip_buffer(const char *);
+static FILE *offline_file(void);
+static void sendmail_compat(int, char **);
 
 extern char	*__progname;
 int		 sendmail;
@@ -93,8 +102,6 @@ struct queue_backend queue_backend_ram;
 __dead void
 usage(void)
 {
-	extern char *__progname;
-
 	if (sendmail)
 		fprintf(stderr, "usage: %s [-tv] [-f from] [-F name] to ...\n",
 		    __progname);
@@ -115,17 +122,17 @@ void stat_decrement(const char *k, size_t v)
 int
 srv_connect(void)
 {
-	struct sockaddr_un	sun;
+	struct sockaddr_un	s_un;
 	int			ctl_sock, saved_errno;
 
 	/* connect to smtpd control socket */
 	if ((ctl_sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
 		err(1, "socket");
 
-	memset(&sun, 0, sizeof(sun));
-	sun.sun_family = AF_UNIX;
-	(void)strlcpy(sun.sun_path, SMTPD_SOCKET, sizeof(sun.sun_path));
-	if (connect(ctl_sock, (struct sockaddr *)&sun, sizeof(sun)) == -1) {
+	memset(&s_un, 0, sizeof(s_un));
+	s_un.sun_family = AF_UNIX;
+	(void)strlcpy(s_un.sun_path, SMTPD_SOCKET, sizeof(s_un.sun_path));
+	if (connect(ctl_sock, (struct sockaddr *)&s_un, sizeof(s_un)) == -1) {
 		saved_errno = errno;
 		close(ctl_sock);
 		errno = saved_errno;
@@ -137,6 +144,38 @@ srv_connect(void)
 
 	return (1);
 }
+
+int
+srv_connected(void)
+{
+	return ibuf != NULL ? 1 : 0;
+}
+
+FILE *
+offline_file(void)
+{
+	char	path[PATH_MAX];
+	int	fd;
+	FILE   *fp;
+
+	if (!bsnprintf(path, sizeof(path), "%s%s/%lld.XXXXXXXXXX", PATH_SPOOL,
+		PATH_OFFLINE, (long long int) time(NULL)))
+		err(EX_UNAVAILABLE, "snprintf");
+
+	if ((fd = mkstemp(path)) == -1 || (fp = fdopen(fd, "w+")) == NULL) {
+		if (fd != -1)
+			unlink(path);
+		err(EX_UNAVAILABLE, "cannot create temporary file %s", path);
+	}
+
+	if (fchmod(fd, 0600) == -1) {
+		unlink(path);
+		err(EX_SOFTWARE, "fchmod");
+	}
+
+	return fp;
+}
+
 
 static void
 srv_flush(void)
@@ -175,7 +214,7 @@ srv_recv(int type)
 			break;
 		}
 
-		if ((n = imsg_read(ibuf)) == -1)
+		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
 			errx(1, "imsg_read error");
 		if (n == 0)
 			errx(1, "pipe closed");
@@ -193,6 +232,51 @@ srv_read(void *dst, size_t sz)
 		memmove(dst, rdata, sz);
 	rlen -= sz;
 	rdata += sz;
+}
+
+static void
+srv_get_int(int *i)
+{
+	uint8_t type;
+
+	srv_read(&type, 1);
+	srv_read(i, sizeof(*i));
+}
+
+static void
+srv_get_time(time_t *t)
+{
+	uint8_t type;
+
+	srv_read(&type, 1);
+	srv_read(t, sizeof(*t));
+}
+
+static void
+srv_get_evpid(uint64_t *evpid)
+{
+	uint8_t type;
+
+	srv_read(&type, 1);
+	srv_read(evpid, sizeof(*evpid));
+}
+
+static void
+srv_get_envelope(struct envelope *evp)
+{
+	uint64_t	 evpid;
+	uint8_t		 type;
+	size_t		 s;
+	const void	*d;
+
+	srv_get_evpid(&evpid);
+	srv_read(&type, sizeof(type));
+	srv_read(&s, sizeof(s));
+	d = rdata;
+	srv_read(NULL, s);
+
+	envelope_load_buffer(evp, d, s - 1);
+	evp->id = evpid;
 }
 
 static void
@@ -272,9 +356,8 @@ srv_iter_envelopes(uint32_t msgid, struct envelope *evp)
 	static uint32_t	currmsgid = 0;
 	static uint64_t	from = 0;
 	static int	done = 0, need_send = 1, found;
-	char		buf[sizeof(*evp)];
-	size_t		buflen;
-	uint64_t	evpid;
+	int		flags;
+	time_t		nexttry;
 
 	if (currmsgid != msgid) {
 		if (currmsgid != 0 && !done)
@@ -307,13 +390,14 @@ srv_iter_envelopes(uint32_t msgid, struct envelope *evp)
 		goto again;
 	}
 
-	srv_read(&evpid, sizeof evpid);
-	buflen = rlen;
-	srv_read(buf, rlen);	
-	envelope_load_buffer(evp, buf, buflen - 1);
-	evp->id = evpid;
-
+	srv_get_int(&flags);
+	srv_get_time(&nexttry);
+	srv_get_envelope(evp);
 	srv_end();
+
+	evp->flags |= flags;
+	evp->nexttry = nexttry;
+
 	from = evp->id + 1;
 	found++;
 	return (1);
@@ -322,7 +406,7 @@ srv_iter_envelopes(uint32_t msgid, struct envelope *evp)
 static int
 srv_iter_evpids(uint32_t msgid, uint64_t *evpid, int *offset)
 {
-	static uint64_t	*evpids = NULL;
+	static uint64_t	*evpids = NULL, *tmp;
 	static int	 n, alloc = 0;
 	struct envelope	 evp;
 
@@ -338,10 +422,11 @@ srv_iter_evpids(uint32_t msgid, uint64_t *evpid, int *offset)
 		while (srv_iter_envelopes(msgid, &evp)) {
 			if (n == alloc) {
 				alloc += 256;
-				evpids = reallocarray(evpids, alloc,
+				tmp = reallocarray(evpids, alloc,
 				    sizeof(*evpids));
-				if (evpids == NULL)
+				if (tmp == NULL)
 					err(1, "reallocarray");
+				evpids = tmp;
 			}
 			evpids[n++] = evp.id;
 		}
@@ -598,7 +683,7 @@ do_show_envelope(int argc, struct parameter *argv)
 {
 	char	 buf[PATH_MAX];
 
-	if (! bsnprintf(buf, sizeof(buf), "%s%s/%02x/%08x/%016" PRIx64,
+	if (!bsnprintf(buf, sizeof(buf), "%s%s/%02x/%08x/%016" PRIx64,
 	    PATH_SPOOL,
 	    PATH_QUEUE,
 	    (evpid_to_msgid(argv[0].u.u_evpid) & 0xff000000) >> 24,
@@ -630,7 +715,7 @@ do_show_message(int argc, struct parameter *argv)
 	else
 		msgid = argv[0].u.u_msgid;
 
-	if (! bsnprintf(buf, sizeof(buf), "%s%s/%02x/%08x/message",
+	if (!bsnprintf(buf, sizeof(buf), "%s%s/%02x/%08x/message",
 		PATH_SPOOL,
 		PATH_QUEUE,
 		(msgid & 0xff000000) >> 24,
@@ -658,7 +743,7 @@ do_show_queue(int argc, struct parameter *argv)
 	if (!srv_connect()) {
 		log_init(1);
 		queue_init("fs", 0);
-		if (chroot(PATH_SPOOL) == -1 || chdir(".") == -1)
+		if (chroot(PATH_SPOOL) == -1 || chdir("/") == -1)
 			err(1, "%s", PATH_SPOOL);
 		fts = fts_open(qpath, FTS_PHYSICAL|FTS_NOCHDIR, NULL);
 		if (fts == NULL)
@@ -719,31 +804,6 @@ do_show_routes(int argc, struct parameter *argv)
 	return (0);
 }
 
-#if 1
-static int
-do_show_sizes(int argc, struct parameter *argv)
-{
-	printf("struct userinfo=%ld\n", sizeof (struct userinfo));
-	printf("struct netaddr=%ld\n", sizeof (struct netaddr));
-	printf("struct relayhost=%ld\n", sizeof (struct relayhost));
-	printf("struct credentials=%ld\n", sizeof (struct credentials));
-	printf("struct destination=%ld\n", sizeof (struct destination));
-	printf("struct source=%ld\n", sizeof (struct source));
-	printf("struct addrname=%ld\n", sizeof (struct addrname));
-	printf("union lookup=%ld\n", sizeof (union lookup));
-	printf("struct delivery_mda=%ld\n", sizeof (struct delivery_mda));
-	printf("struct delivery_mta=%ld\n", sizeof (struct delivery_mta));
-	printf("struct envelope=%ld\n", sizeof (struct envelope));
-	printf("struct forward_req=%ld\n", sizeof (struct forward_req));
-	printf("struct deliver=%ld\n", sizeof (struct deliver));
-	printf("struct bounce_req_msg=%ld\n", sizeof (struct bounce_req_msg));
-	printf("struct ca_cert_req_msg=%ld\n", sizeof (struct ca_cert_req_msg));
-	printf("struct ca_vrfy_req_msg=%ld\n", sizeof (struct ca_vrfy_req_msg));
-	return 0;
-}
-#endif
-
-
 static int
 do_show_stats(int argc, struct parameter *argv)
 {
@@ -771,7 +831,7 @@ do_show_stats(int argc, struct parameter *argv)
 			switch (kv.val.type) {
 			case STAT_COUNTER:
 				printf("%s=%zd\n",
-				    kv.key, (ssize_t)kv.val.u.counter);
+				    kv.key, kv.val.u.counter);
 				break;
 			case STAT_TIMESTAMP:
 				printf("%s=%" PRId64 "\n",
@@ -870,7 +930,7 @@ do_encrypt(int argc, struct parameter *argv)
 
 	if (argv)
 		p = argv[0].u.u_str;
-	execl(PATH_ENCRYPT, "encrypt", p, NULL);
+	execl(PATH_ENCRYPT, "encrypt", p, (char *)NULL);
 	errx(1, "execl");
 }
 
@@ -946,7 +1006,7 @@ do_discover(int argc, struct parameter *argv)
 		srv_read(&n_evp, sizeof n_evp);
 		srv_end();
 	}
-	
+
 	printf("%zu envelope%s discovered\n", n_evp, (n_evp != 1) ? "s" : "");
 	return (0);
 }
@@ -979,16 +1039,16 @@ do_uncorrupt(int argc, struct parameter *argv)
 int
 main(int argc, char **argv)
 {
-	char	*argv_mailq[] = { "show", "queue", NULL };
+	gid_t		 gid;
+	char		*argv_mailq[] = { "show", "queue", NULL };
 
-	if (strcmp(__progname, "sendmail") == 0 ||
-	    strcmp(__progname, "send-mail") == 0) {
-		sendmail = 1;
-		return (enqueue(argc, argv));
-	}
-
+	sendmail_compat(argc, argv);
 	if (geteuid())
 		errx(1, "need root privileges");
+
+	gid = getgid();
+	if (setresgid(gid, gid, gid) == -1)
+		err(1, "setresgid");
 
 	cmd_install("discover <evpid>",		do_discover);
 	cmd_install("discover <msgid>",		do_discover);
@@ -1002,14 +1062,17 @@ main(int argc, char **argv)
 	cmd_install("monitor",			do_monitor);
 	cmd_install("pause envelope <evpid>",	do_pause_envelope);
 	cmd_install("pause envelope <msgid>",	do_pause_envelope);
+	cmd_install("pause envelope all",	do_pause_envelope);
 	cmd_install("pause mda",		do_pause_mda);
 	cmd_install("pause mta",		do_pause_mta);
 	cmd_install("pause smtp",		do_pause_smtp);
 	cmd_install("profile <str>",		do_profile);
 	cmd_install("remove <evpid>",		do_remove);
 	cmd_install("remove <msgid>",		do_remove);
+	cmd_install("remove all",		do_remove);
 	cmd_install("resume envelope <evpid>",	do_resume_envelope);
 	cmd_install("resume envelope <msgid>",	do_resume_envelope);
+	cmd_install("resume envelope all",	do_resume_envelope);
 	cmd_install("resume mda",		do_resume_mda);
 	cmd_install("resume mta",		do_resume_mta);
 	cmd_install("resume route <routeid>",	do_resume_route);
@@ -1035,12 +1098,6 @@ main(int argc, char **argv)
 	cmd_install("untrace <str>",		do_untrace);
 	cmd_install("update table <str>",	do_update_table);
 
-#if 1
-	/* print size of various structures */
-	cmd_install("show sizes",		do_show_sizes);
-#endif
-
-
 	if (strcmp(__progname, "mailq") == 0)
 		return cmd_run(2, argv_mailq);
 	if (strcmp(__progname, "smtpctl") == 0)
@@ -1048,7 +1105,44 @@ main(int argc, char **argv)
 
 	errx(1, "unsupported mode");
 	return (0);
+}
 
+void
+sendmail_compat(int argc, char **argv)
+{
+	FILE	*offlinefp = NULL;
+	gid_t	 gid;
+	int	 i;
+
+	if (strcmp(__progname, "sendmail") == 0 ||
+	    strcmp(__progname, "send-mail") == 0) {
+		/*
+		 * determine whether we are called with flags
+		 * that should invoke makemap/newaliases.
+		 */
+		for (i = 1; i < argc; i++)
+			if (strncmp(argv[i], "-bi", 3) == 0) {
+				__progname = "newaliases";
+				exit(makemap(argc, argv));
+			}
+
+		if (!srv_connect())
+			offlinefp = offline_file();
+
+		gid = getgid();
+		if (setresgid(gid, gid, gid) == -1)
+			err(1, "setresgid");
+
+		/* we'll reduce further down the road */
+		if (pledge("stdio rpath wpath cpath tmppath flock "
+			"dns getpw recvfd", NULL) == -1)
+			err(1, "pledge");
+
+		sendmail = 1;
+		exit(enqueue(argc, argv, offlinefp));
+	} else if (strcmp(__progname, "makemap") == 0 ||
+	    strcmp(__progname, "newaliases") == 0)
+		exit(makemap(argc, argv));
 }
 
 static void
@@ -1070,8 +1164,8 @@ show_queue_envelope(struct envelope *e, int online)
 			(void)snprintf(runstate, sizeof runstate, "pending|%zd",
 			    (ssize_t)(e->nexttry - now));
 		else if (e->flags & EF_INFLIGHT)
-			(void)snprintf(runstate, sizeof runstate, "inflight|%zd",
-			    (ssize_t)(now - e->lasttry));
+			(void)snprintf(runstate, sizeof runstate,
+			    "inflight|%zd", (ssize_t)(now - e->lasttry));
 		else
 			(void)snprintf(runstate, sizeof runstate, "invalid|");
 		e->flags &= ~(EF_PENDING|EF_INFLIGHT);
@@ -1143,7 +1237,7 @@ show_offline_envelope(uint64_t evpid)
 
 	struct envelope	evp;
 
-	if (! bsnprintf(pathname, sizeof pathname,
+	if (!bsnprintf(pathname, sizeof pathname,
 		"/queue/%02x/%08x/%016"PRIx64,
 		(evpid_to_msgid(evpid) & 0xff000000) >> 24,
 		evpid_to_msgid(evpid), evpid))
@@ -1167,7 +1261,7 @@ show_offline_envelope(uint64_t evpid)
 		goto end;
 	}
 
-	if (! envelope_load_buffer(&evp, p, plen))
+	if (!envelope_load_buffer(&evp, p, plen))
 		goto end;
 	evp.id = evpid;
 	show_queue_envelope(&evp, 0);
@@ -1194,7 +1288,7 @@ display(const char *s)
 #ifdef HAVE_GCM_CRYPTO
 		int	i;
 		int	fd;
-		FILE   *ofp;
+		FILE   *ofp = NULL;
 		char	sfn[] = "/tmp/smtpd.XXXXXXXXXX";
 
 		if ((fd = mkstemp(sfn)) == -1 ||
@@ -1216,7 +1310,7 @@ display(const char *s)
 		if (i == 3)
 			errx(1, "crypto-setup: invalid key");
 
-		if (! crypto_decrypt_file(fp, ofp)) {
+		if (!crypto_decrypt_file(fp, ofp)) {
 			printf("object is encrypted: %s\n", key);
 			exit(1);
 		}
@@ -1234,9 +1328,9 @@ display(const char *s)
 	lseek(fileno(fp), 0, SEEK_SET);
 	(void)dup2(fileno(fp), STDIN_FILENO);
 	if (gzipped)
-		execl(PATH_GZCAT, gzcat_argv0, NULL);
+		execl(PATH_GZCAT, gzcat_argv0, (char *)NULL);
 	else
-		execl(PATH_CAT, "cat", NULL);
+		execl(PATH_CAT, "cat", (char *)NULL);
 	err(1, "execl");
 }
 
@@ -1332,7 +1426,7 @@ static int
 is_encrypted_fp(FILE *fp)
 {
 	uint8_t	magic;
-	int    	ret = 0;
+	int	ret = 0;
 
 	if (fread(&magic, 1, sizeof magic, fp) != sizeof magic)
 		goto end;

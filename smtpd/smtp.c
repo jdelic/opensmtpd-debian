@@ -1,4 +1,4 @@
-/*	$OpenBSD: smtp.c,v 1.136 2014/04/19 13:52:49 gilles Exp $	*/
+/*	$OpenBSD: smtp.c,v 1.154 2016/02/13 20:43:07 gilles Exp $	*/
 
 /*
  * Copyright (c) 2008 Gilles Chehade <gilles@poolp.org>
@@ -49,7 +49,7 @@ static void smtp_setup_events(void);
 static void smtp_pause(void);
 static void smtp_resume(void);
 static void smtp_accept(int, short, void *);
-static int smtp_enqueue(uid_t *);
+static int smtp_enqueue(void);
 static int smtp_can_accept(void);
 static void smtp_setup_listeners(void);
 static int smtp_sni_callback(SSL *, int *, void *);
@@ -89,7 +89,7 @@ smtp_imsg(struct mproc *p, struct imsg *imsg)
 
 		case IMSG_QUEUE_SMTP_SESSION:
 			m_compose(p, IMSG_QUEUE_SMTP_SESSION, 0, 0,
-			    smtp_enqueue(NULL), imsg->data,
+			    smtp_enqueue(), imsg->data,
 			    imsg->hdr.len - sizeof imsg->hdr);
 			return;
 		}
@@ -99,7 +99,7 @@ smtp_imsg(struct mproc *p, struct imsg *imsg)
 		switch (imsg->hdr.type) {
 		case IMSG_CTL_SMTP_SESSION:
 			m_compose(p, IMSG_CTL_SMTP_SESSION, imsg->hdr.peerid, 0,
-			    smtp_enqueue(imsg->data), NULL, 0);
+			    smtp_enqueue(), NULL, 0);
 			return;
 
 		case IMSG_CTL_PAUSE_SMTP:
@@ -143,8 +143,7 @@ smtp_setup_listeners(void)
 	int			opt;
 
 	TAILQ_FOREACH(l, env->sc_listeners, entry) {
-		l->fd = socket(l->ss.ss_family, SOCK_STREAM, 0);
-		if (l->fd == -1) {
+		if ((l->fd = socket(l->ss.ss_family, SOCK_STREAM, 0)) == -1) {
 			if (errno == EAFNOSUPPORT) {
 				log_warn("smtpd: socket");
 				continue;
@@ -160,6 +159,16 @@ smtp_setup_listeners(void)
 		if (setsockopt(l->fd, SOL_SOCKET, SO_REUSEPORT, &opt,
 			sizeof(opt)) < 0)
 			fatal("smtpd: setsockopt");
+#endif
+#ifdef IPV6_V6ONLY
+		/*
+		 * If using IPv6, bind only to IPv6 if possible.
+		 * This avoids ambiguities with IPv4-mapped IPv6 addresses.
+		 */
+		if (l->ss.ss_family == AF_INET6)
+			if (setsockopt(l->fd, IPPROTO_IPV6, IPV6_V6ONLY, &opt,
+				sizeof(opt)) < 0)
+				fatal("smtpd: setsockopt");
 #endif
 		if (bind(l->fd, (struct sockaddr *)&l->ss, SS_LEN(&l->ss)) == -1)
 			fatal("smtpd: bind");
@@ -192,16 +201,16 @@ smtp_setup_events(void)
 
 	iter = NULL;
 	while (dict_iter(env->sc_pki_dict, &iter, &k, (void **)&pki)) {
-		if (! ssl_setup((SSL_CTX **)&ssl_ctx, pki, smtp_sni_callback,
-			env->sc_tls_ciphers, env->sc_tls_curve))
+		if (!ssl_setup((SSL_CTX **)&ssl_ctx, pki, smtp_sni_callback,
+			env->sc_tls_ciphers))
 			fatal("smtp_setup_events: ssl_setup failure");
 		dict_xset(env->sc_ssl_dict, k, ssl_ctx);
 	}
 
 	purge_config(PURGE_PKI_KEYS);
 
-	maxsessions = ((getdtablesize() - getdtablecount()) & ~0x1) / 2 - SMTP_FD_RESERVE;
-	log_debug("debug: smtp: will accept at most %d clients", (int)maxsessions);
+	maxsessions = (getdtablesize() - getdtablecount()) / 2 - SMTP_FD_RESERVE;
+	log_debug("debug: smtp: will accept at most %zu clients", maxsessions);
 }
 
 static void
@@ -229,24 +238,10 @@ smtp_resume(void)
 }
 
 static int
-smtp_enqueue(uid_t *euid)
+smtp_enqueue(void)
 {
-	static struct listener	 local, *listener = NULL;
-	char			 buf[HOST_NAME_MAX+1], *hostname;
-	int			 fd[2];
-
-	if (listener == NULL) {
-		listener = &local;
-		(void)strlcpy(listener->tag, "local", sizeof(listener->tag));
-		listener->ss.ss_family = AF_LOCAL;
-#ifdef HAVE_STRUCT_SOCKADDR_STORAGE_SS_LEN
-		listener->ss.ss_len = sizeof(struct sockaddr *);
-#endif
-		(void)strlcpy(listener->hostname, env->sc_hostname,
-		    sizeof(listener->hostname));
-		(void)strlcpy(listener->filter, env->sc_enqueue_filter,
-		    sizeof listener->filter);
-	}
+	struct listener	*listener = env->sc_sock_listener;
+	int		 fd[2];
 
 	/*
 	 * Some enqueue requests buffered in IMSG may still arrive even after
@@ -256,17 +251,10 @@ smtp_enqueue(uid_t *euid)
 	if (env->sc_flags & SMTPD_SMTP_PAUSED)
 		return (-1);
 
-	/* XXX don't fatal here */
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, fd))
 		return (-1);
 
-	hostname = env->sc_hostname;
-	if (euid) {
-		(void)snprintf(buf, sizeof(buf), "%s", hostname);
-		hostname = buf;
-	}
-
-	if ((smtp_session(listener, fd[0], &listener->ss, hostname)) == -1) {
+	if ((smtp_session(listener, fd[0], &listener->ss, env->sc_hostname)) == -1) {
 		close(fd[0]);
 		close(fd[1]);
 		return (-1);
@@ -290,7 +278,7 @@ smtp_accept(int fd, short event, void *p)
 	if (env->sc_flags & SMTPD_SMTP_PAUSED)
 		fatalx("smtp_session: unexpected client");
 
-	if (! smtp_can_accept()) {
+	if (!smtp_can_accept()) {
 		log_warnx("warn: Disabling incoming SMTP connections: "
 		    "Client limit reached");
 		goto pause;
@@ -314,7 +302,6 @@ smtp_accept(int fd, short event, void *p)
 		return;
 	}
 	io_set_blocking(sock, 0);
-	session_socket_no_linger(sock);
 
 	sessions++;
 	stat_increment("smtp.session", 1);

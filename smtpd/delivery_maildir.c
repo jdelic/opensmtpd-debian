@@ -1,4 +1,4 @@
-/*	$OpenBSD: delivery_maildir.c,v 1.13 2014/04/19 17:31:35 gilles Exp $	*/
+/*	$OpenBSD: delivery_maildir.c,v 1.17 2015/12/28 22:08:30 jung Exp $	*/
 
 /*
  * Copyright (c) 2011 Gilles Chehade <gilles@poolp.org>
@@ -91,11 +91,11 @@ delivery_maildir_open(struct deliver *deliver)
 	setproctitle("maildir delivery");
 
 	memset(&maddr, 0, sizeof maddr);
-	if (! text_to_mailaddr(&maddr, deliver->dest))
+	if (!text_to_mailaddr(&maddr, deliver->dest))
 		error("cannot parse destination address");
 
 	memset(tag, 0, sizeof tag);
-	if (! mailaddr_tag(&maddr, tag, sizeof tag))
+	if (!mailaddr_tag(&maddr, tag, sizeof tag))
 		error("cannot extract tag from destination address");
 
 	if (mkdirs(deliver->to, 0700) < 0 && errno != EEXIST)
