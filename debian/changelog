@@ -1,3 +1,20 @@
+opensmtpd (5.9.2p1-1) unstable; urgency=medium
+
+  * New upstream release
+    + Drop 04_no_mailq.diff, 11_smtpd.conf.5_typo.diff: no longer needed
+  * Make debian-branch for sid debian/sid
+  * Updated copyright holders
+  * Updated standards-version to 3.9.8
+  * Fix bug in getalias() in debian/config
+  * Don't install empty /usr/bin in opensmtpd package
+  * Update lintian override for missing-license-paragraph-in-dep5-copyright
+  * Update our configure options to reflect name changes
+  * Install missing links to smtpctl for makemap and newaliases
+  * opensmtpd now requires different permissions and ownership for the offline
+    queue and purge directories; update these accordingly
+
+ -- Ryan Kavanagh <rak@debian.org>  Sat, 11 Jun 2016 14:21:51 -0400
+
 opensmtpd (5.7.3p2-1) unstable; urgency=medium
 
   * New upstream release
