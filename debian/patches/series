@@ -1,4 +1,2 @@
-04_no_mailq.diff
 07_automake_missing_options.diff
 10_smtpd.conf.diff
-11_smtpd.conf.5_typo.diff
