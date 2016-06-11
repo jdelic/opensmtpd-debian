@@ -19,8 +19,8 @@ override_dh_fixperms:
 	dh_fixperms
 	chmod 711 debian/opensmtpd/var/spool/smtpd
 	# OpenSMTPD needs the offline mail queue (for messages sent locally,
-	# e.g., via /usr/sbin/sendmail) to be 1777
-	chmod 1777 debian/opensmtpd/var/spool/smtpd/offline
+	# e.g., via /usr/sbin/sendmail) to be 1770
+	chmod 1770 debian/opensmtpd/var/spool/smtpd/offline
 
 override_dh_auto_install:
 	dh_auto_install

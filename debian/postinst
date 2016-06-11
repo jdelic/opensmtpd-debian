@@ -175,6 +175,8 @@ case "$1" in
                     --no-create-home --disabled-password \
                     --gecos "OpenSMTD queue user" \
                     --ingroup opensmtpq opensmtpq
+        chown root:opensmtpq /var/spool/smtpd/offline
+        chmod 770 /var/spool/smtpd/offline
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure|reconfigure)
