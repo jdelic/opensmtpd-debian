@@ -177,6 +177,7 @@ case "$1" in
                     --ingroup opensmtpq opensmtpq
         chown root:opensmtpq /var/spool/smtpd/offline
         chmod 770 /var/spool/smtpd/offline
+        chmod 700 /var/spool/smtpd/purge
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure|reconfigure)
