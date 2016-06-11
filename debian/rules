@@ -5,14 +5,15 @@
 
 override_dh_auto_configure:
 	dh_auto_configure -- \
-	    --with-pam \
+	    --with-auth-pam \
+	    --with-group-queue=opensmtpq \
 	    --with-mantype=man \
-	    --with-maildir=/var/mail \
-	    --with-privsep-path=/var/lib/opensmtpd/empty \
-	    --with-privsep-user=opensmtpd \
-	    --with-queue-user=opensmtpq \
-	    --enable-table-db \
-	    --with-ca-file=/etc/ssl/certs/ca-certificates.crt
+	    --with-path-CAfile=/etc/ssl/certs/ca-certificates.crt \
+	    --with-path-empty=/var/lib/opensmtpd/empty \
+	    --with-path-mbox=/var/mail \
+	    --with-table-db \
+	    --with-user-queue=opensmtpq \
+	    --with-user-smtpd=opensmtpd
 
 override_dh_fixperms:
 	dh_fixperms
