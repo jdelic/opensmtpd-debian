@@ -24,6 +24,7 @@ Conflicts: mail-transport-agent
 Replaces: mail-transport-agent
 Depends: ${shlibs:Depends}, ${misc:Depends}
  , adduser
+ , ed
 Recommends: opensmtpd-extras
 Description: secure, reliable, lean, and easy-to configure SMTP server
  The OpenSMTPD server seeks to be
