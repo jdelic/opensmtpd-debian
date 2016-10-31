@@ -100,9 +100,21 @@
    don't. */
 #undef HAVE_DECL_AF_LOCAL
 
+/* Define to 1 if you have the declaration of `altzone', and to 0 if you
+   don't. */
+#undef HAVE_DECL_ALTZONE
+
 /* Define to 1 if you have the declaration of `O_NONBLOCK', and to 0 if you
    don't. */
 #undef HAVE_DECL_O_NONBLOCK
+
+/* Define to 1 if you have the declaration of `timezone', and to 0 if you
+   don't. */
+#undef HAVE_DECL_TIMEZONE
+
+/* Define to 1 if you have the declaration of `tzname', and to 0 if you don't.
+   */
+#undef HAVE_DECL_TZNAME
 
 /* Define to 1 if you have the declaration of `WAIT_MYPGRP', and to 0 if you
    don't. */
@@ -138,6 +150,9 @@
 
 /* Define to 1 if you have the `fgetln' function. */
 #undef HAVE_FGETLN
+
+/* Define to 1 if you have the `flock' function. */
+#undef HAVE_FLOCK
 
 /* Define if you have the fmt_scaled() function. */
 #undef HAVE_FMT_SCALED
@@ -470,6 +485,12 @@
 /* Define to 1 if the system has the type `struct timeval'. */
 #undef HAVE_STRUCT_TIMEVAL
 
+/* Define to 1 if `tm_gmtoff' is a member of `struct tm'. */
+#undef HAVE_STRUCT_TM_TM_GMTOFF
+
+/* Define to 1 if `tm_zone' is a member of `struct tm'. */
+#undef HAVE_STRUCT_TM_TM_ZONE
+
 /* Define to 1 if you have the `sysconf' function. */
 #undef HAVE_SYSCONF
 
@@ -687,6 +708,9 @@
 #  undef WORDS_BIGENDIAN
 # endif
 #endif
+
+/* "path to pidfile directory" */
+#undef _PATH_VARRUN
 
 /* Define for Solaris 2.5.1 so the uint32_t typedef from <sys/synch.h>,
    <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the

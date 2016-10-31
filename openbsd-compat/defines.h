@@ -195,11 +195,11 @@ struct	sockaddr_un {
 #endif /* HAVE_SYS_UN_H */
 
 #ifndef HAVE_IN_ADDR_T
-typedef u_int32_t	in_addr_t;
+typedef uint32_t	in_addr_t;
 #endif
 
 #ifndef HAVE_IN_PORT_T
-typedef u_int16_t	in_port_t;
+typedef uint16_t	in_port_t;
 #endif
 
 
@@ -278,8 +278,8 @@ typedef u_int16_t	in_port_t;
 
 #if !defined(IN6_IS_ADDR_V4MAPPED)
 # define IN6_IS_ADDR_V4MAPPED(a) \
-	((((u_int32_t *) (a))[0] == 0) && (((u_int32_t *) (a))[1] == 0) && \
-	 (((u_int32_t *) (a))[2] == htonl (0xffff)))
+	((((uint32_t *) (a))[0] == 0) && (((uint32_t *) (a))[1] == 0) && \
+	 (((uint32_t *) (a))[2] == htonl (0xffff)))
 #endif /* !defined(IN6_IS_ADDR_V4MAPPED) */
 
 #if !defined(__GNUC__) || (__GNUC__ < 2)
@@ -507,6 +507,13 @@ typedef u_int16_t	in_port_t;
 
 #ifndef SCOPE_DELIMITER
 #define	SCOPE_DELIMITER '%'
+#endif
+
+#ifndef HAVE_FLOCK
+#define LOCK_SH         0x01            /* shared file lock */
+#define LOCK_EX         0x02            /* exclusive file lock */
+#define LOCK_NB         0x04            /* don't block when locking */
+#define LOCK_UN         0x08            /* unlock file */
 #endif
 
 #endif /* _DEFINES_H */

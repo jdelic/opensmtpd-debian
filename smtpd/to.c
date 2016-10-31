@@ -1,4 +1,4 @@
-/*	$OpenBSD: to.c,v 1.26 2016/02/15 12:53:50 mpi Exp $	*/
+/*	$OpenBSD: to.c,v 1.28 2016/05/30 12:33:44 mpi Exp $	*/
 
 /*
  * Copyright (c) 2009 Jacek Masiulaniec <jacekm@dobremiasto.net>
@@ -60,7 +60,7 @@ static int alias_is_filename(struct expandnode *, const char *, size_t);
 static int alias_is_include(struct expandnode *, const char *, size_t);
 static int alias_is_error(struct expandnode *, const char *, size_t);
 
-static int temp_inet_net_pton_ipv6(const char *, void *, size_t);
+static int broken_inet_net_pton_ipv6(const char *, void *, size_t);
 
 const char *
 sockaddr_to_text(struct sockaddr *sa)
@@ -200,10 +200,20 @@ time_to_text(time_t when)
 	char *day[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 	char *month[] = {"Jan","Feb","Mar","Apr","May","Jun",
 			 "Jul","Aug","Sep","Oct","Nov","Dec"};
+	char *tz;
+	long offset;
 
 	lt = localtime(&when);
 	if (lt == NULL || when == 0)
 		fatalx("time_to_text: localtime");
+
+#if HAVE_STRUCT_TM_TM_GMTOFF
+	offset = lt->tm_gmtoff;
+	tz = lt->tm_zone;
+#elif defined HAVE_DECL_ALTZONE && defined HAVE_DECL_TIMEZONE
+	offset = lt->tm_isdst > 0 ? altzone : timezone;
+	tz = lt->tm_isdst > 0 ? tzname[1] : tzname[0];
+#endif
 
 	/* We do not use strftime because it is subject to locale substitution*/
 	if (!bsnprintf(buf, sizeof(buf),
@@ -211,10 +221,10 @@ time_to_text(time_t when)
 	    day[lt->tm_wday], lt->tm_mday, month[lt->tm_mon],
 	    lt->tm_year + 1900,
 	    lt->tm_hour, lt->tm_min, lt->tm_sec,
-	    lt->tm_gmtoff >= 0 ? '+' : '-',
-	    abs((int)lt->tm_gmtoff / 3600),
-	    abs((int)lt->tm_gmtoff % 3600) / 60,
-	    lt->tm_zone))
+	    offset >= 0 ? '+' : '-',
+	    abs((int)offset / 3600),
+	    abs((int)offset % 3600) / 60,
+	    tz))
 		fatalx("time_to_text: bsnprintf");
 
 	return buf;
@@ -280,62 +290,30 @@ text_to_netaddr(struct netaddr *netaddr, const char *s)
 	if (strncasecmp("IPv6:", s, 5) == 0)
 		s += 5;
 
-	if (strchr(s, '/') != NULL) {
-		/* dealing with netmask */
-		bits = inet_net_pton(AF_INET, s, &ssin.sin_addr,
-		    sizeof(struct in_addr));
-		if (bits != -1) {
-			ssin.sin_family = AF_INET;
-			memcpy(&ss, &ssin, sizeof(ssin));
+	bits = inet_net_pton(AF_INET, s, &ssin.sin_addr,
+	    sizeof(struct in_addr));
+	if (bits != -1) {
+		ssin.sin_family = AF_INET;
+		memcpy(&ss, &ssin, sizeof(ssin));
 #ifdef HAVE_STRUCT_SOCKADDR_STORAGE_SS_LEN
-			ss.ss_len = sizeof(struct sockaddr_in);
+		ss.ss_len = sizeof(struct sockaddr_in);
 #endif
-		}
-		else {
-			bits = inet_net_pton(AF_INET6, s, &ssin6.sin6_addr,
-			    sizeof(struct in6_addr));
-			if (bits == -1) {
-
-				/* XXX - some systems don't support
-				   inet_net_pton(AF_INET6, ...); */
-				if (errno != EAFNOSUPPORT) {
-					log_warn("inet_net_pton");
-					return 0;
-				}
-				bits = temp_inet_net_pton_ipv6(s,
-				    &ssin6.sin6_addr,
-				    sizeof(struct in6_addr));
-			}
-			if (bits == -1) {
-				log_warn("warn: inet_net_pton");
+	} else {
+		bits = inet_net_pton(AF_INET6, s, &ssin6.sin6_addr,
+		    sizeof(struct in6_addr));
+		if (bits == -1) {
+			if (errno != EAFNOSUPPORT)
 				return 0;
-			}
-			ssin6.sin6_family = AF_INET6;
-			memcpy(&ss, &ssin6, sizeof(ssin6));
-#ifdef HAVE_STRUCT_SOCKADDR_STORAGE_SS_LEN
-			ss.ss_len = sizeof(struct sockaddr_in6);
-#endif
+			bits = broken_inet_net_pton_ipv6(s, &ssin6.sin6_addr,
+			    sizeof(struct in6_addr));
+			if (bits == -1)
+				return 0;
 		}
-	}
-	else {
-		/* IP address ? */
-		if (inet_pton(AF_INET, s, &ssin.sin_addr) == 1) {
-			ssin.sin_family = AF_INET;
-			bits = 32;
-			memcpy(&ss, &ssin, sizeof(ssin));
+		ssin6.sin6_family = AF_INET6;
+		memcpy(&ss, &ssin6, sizeof(ssin6));
 #ifdef HAVE_STRUCT_SOCKADDR_STORAGE_SS_LEN
-			ss.ss_len = sizeof(struct sockaddr_in);
+		ss.ss_len = sizeof(struct sockaddr_in6);
 #endif
-		}
-		else if (inet_pton(AF_INET6, s, &ssin6.sin6_addr) == 1) {
-			ssin6.sin6_family = AF_INET6;
-			bits = 128;
-			memcpy(&ss, &ssin6, sizeof(ssin6));
-#ifdef HAVE_STRUCT_SOCKADDR_STORAGE_SS_LEN
-			ss.ss_len = sizeof(struct sockaddr_in6);
-#endif
-		}
-		else return 0;
 	}
 
 	netaddr->ss   = ss;
@@ -924,7 +902,7 @@ alias_is_error(struct expandnode *alias, const char *line, size_t len)
 }
 
 static int
-temp_inet_net_pton_ipv6(const char *src, void *dst, size_t size)
+broken_inet_net_pton_ipv6(const char *src, void *dst, size_t size)
 {
 	int	ret;
 	int	bits;

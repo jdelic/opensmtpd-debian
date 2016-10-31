@@ -133,7 +133,7 @@ void arc4random_buf(void *, size_t);
 #endif
 
 #ifndef HAVE_ARC4RANDOM_UNIFORM
-u_int32_t arc4random_uniform(u_int32_t);
+uint32_t arc4random_uniform(uint32_t);
 #endif
 
 #ifndef HAVE_ASPRINTF
@@ -212,11 +212,15 @@ void errc(int, int, const char *, ...);
 #define pledge(promises, paths) 0
 #endif
 
-#if !HAVE_DECL_AF_LOCAL
+#ifndef HAVE_DECL_AF_LOCAL
 #define AF_LOCAL AF_UNIX
 #endif
 
-#if !HAVE_DECL_WAIT_MYPGRP
+#ifndef HAVE_DECL_WAIT_MYPGRP
 #define WAIT_MYPGRP 0
+#endif
+
+#ifndef HAVE_FLOCK
+int flock(int, int);
 #endif
 #endif /* _OPENBSD_COMPAT_H */

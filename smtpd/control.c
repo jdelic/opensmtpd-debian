@@ -1,4 +1,4 @@
-/*	$OpenBSD: control.c,v 1.111 2016/02/09 10:38:02 gilles Exp $	*/
+/*	$OpenBSD: control.c,v 1.113 2016/05/28 21:21:20 eric Exp $	*/
 
 /*
  * Copyright (c) 2012 Gilles Chehade <gilles@poolp.org>
@@ -238,29 +238,18 @@ control_create_socket(void)
 		fatal("control: chmod");
 	}
 
-	session_socket_blockmode(fd, BM_NONBLOCK);
+	io_set_nonblocking(fd);
 	control_state.fd = fd;
 
 	return fd;
 }
 
-pid_t
+int
 control(void)
 {
-	pid_t			 pid;
 	struct passwd		*pw;
 	struct event		 ev_sigint;
 	struct event		 ev_sigterm;
-
-	switch (pid = fork()) {
-	case -1:
-		fatal("control: cannot fork");
-	case 0:
-		post_fork(PROC_CONTROL);
-		break;
-	default:
-		return (pid);
-	}
 
 	purge_config(PURGE_EVERYTHING);
 
@@ -361,7 +350,7 @@ control_accept(int listenfd, short event, void *arg)
 		fatal("control_accept: accept");
 	}
 
-	session_socket_blockmode(connfd, BM_NONBLOCK);
+	io_set_nonblocking(connfd);
 
 	if (getpeereid(connfd, &euid, &egid) == -1)
 		fatal("getpeereid");

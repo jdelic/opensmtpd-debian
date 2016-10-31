@@ -1,4 +1,4 @@
-/*	$OpenBSD: parse.y,v 1.183 2016/02/22 16:19:05 gilles Exp $	*/
+/*	$OpenBSD: parse.y,v 1.186 2016/07/01 17:53:23 eric Exp $	*/
 
 /*
  * Copyright (c) 2008 Gilles Chehade <gilles@poolp.org>
@@ -184,7 +184,7 @@ typedef struct {
 %token	TABLE SECURE SMTPS CERTIFICATE DOMAIN BOUNCEWARN LIMIT INET4 INET6 NODSN SESSION
 %token  RELAY BACKUP VIA DELIVER TO LMTP MAILDIR MBOX RCPTTO HOSTNAME HOSTNAMES
 %token	ACCEPT REJECT INCLUDE ERROR MDA FROM FOR SOURCE MTA PKI SCHEDULER
-%token	ARROW AUTH TLS LOCAL VIRTUAL TAG TAGGED ALIAS FILTER KEY CA DHPARAMS
+%token	ARROW AUTH TLS LOCAL VIRTUAL TAG TAGGED ALIAS FILTER KEY CA DHE
 %token	AUTH_OPTIONAL TLS_REQUIRE USERBASE SENDER SENDERS MASK_SOURCE VERIFY FORWARDONLY RECIPIENT
 %token	CIPHERS RECEIVEDAUTH MASQUERADE SOCKET
 %token	<v.string>	STRING
@@ -221,6 +221,14 @@ include		: INCLUDE STRING		{
 		;
 
 varset		: STRING '=' STRING		{
+			char *s = $1;
+			while (*s++) {
+				if (isspace((unsigned char)*s)) {
+					yyerror("macro name cannot contain "
+					    "whitespace");
+					YYERROR;
+				}
+			}
 			if (symset($1, $3, 0) == -1)
 				fatal("cannot store variable");
 			free($1);
@@ -405,8 +413,19 @@ opt_pki		: CERTIFICATE STRING {
 		| KEY STRING {
 			pki->pki_key_file = $2;
 		}
-		| DHPARAMS STRING {
-			pki->pki_dhparams_file = $2;
+		| DHE STRING {
+			if (strcasecmp($2, "none") == 0)
+				pki->pki_dhe = 0;
+			else if (strcasecmp($2, "auto") == 0)
+				pki->pki_dhe = 1;
+			else if (strcasecmp($2, "legacy") == 0)
+				pki->pki_dhe = 2;
+			else {
+				yyerror("invalid DHE keyword: %s", $2);
+				free($2);
+				YYERROR;
+			}
+			free($2);
 		}
 		;
 
@@ -1468,7 +1487,7 @@ lookup(char *s)
 		{ "ciphers",		CIPHERS },
 		{ "compression",	COMPRESSION },
 		{ "deliver",		DELIVER },
-		{ "dhparams",		DHPARAMS },
+		{ "dhe",		DHE },
 		{ "domain",		DOMAIN },
 		{ "encryption",		ENCRYPTION },
 		{ "expire",		EXPIRE },
@@ -2084,6 +2103,7 @@ create_sock_listener(struct listen_opts *lo)
 #ifdef HAVE_STRUCT_SOCKADDR_STORAGE_SS_LEN
 	l->ss.ss_len = sizeof(struct sockaddr *);
 #endif
+	l->local = 1;
 	config_listener(l, lo);
 
 	return (l);
