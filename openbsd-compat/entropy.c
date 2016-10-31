@@ -48,7 +48,6 @@ void
 seed_rng(void)
 {
 	u_long	mask;
-	int	error;
 
 	/*
 	 * OpenSSL version numbers: MNNFFPPS: major minor fix patch status
@@ -57,16 +56,11 @@ seed_rng(void)
 	 * allow 1.0.1 to work with 1.0.0). Going backwards is only allowed
 	 * within a patch series.
 	 */
-	error = 0;
 	mask = SSLeay() >= 0x1000000f ?  0xfff00000L : 0xfffff00fL;
-	if (SSLeay() >= 0x1000000f)
-		if ((SSLeay() & 0xfffffff0L) < (OPENSSL_VERSION_NUMBER & 0xfffffff0L))
-			error = 1;
-	if ((SSLeay() ^ OPENSSL_VERSION_NUMBER) & mask || (SSLeay() >> 12) < (OPENSSL_VERSION_NUMBER >> 12))
-		error = 1;
-	if (error)
+	if ((SSLeay() & mask) < (OPENSSL_VERSION_NUMBER & mask)) {
 		fatalx("OpenSSL version mismatch. Built against %lx, you have %lx\n",
 		    (u_long)OPENSSL_VERSION_NUMBER, SSLeay());
+	}
 
 	if (RAND_status() != 1)
 		fatal("PRNG is not seeded");

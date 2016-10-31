@@ -1,4 +1,4 @@
-/*	$OpenBSD: smtpd.h,v 1.513 2016/02/21 15:17:25 gilles Exp $	*/
+/*	$OpenBSD: smtpd.h,v 1.516 2016/07/24 16:04:53 gilles Exp $	*/
 
 /*
  * Copyright (c) 2008 Gilles Chehade <gilles@poolp.org>
@@ -74,7 +74,7 @@
 #ifndef SMTPD_NAME
 #define	SMTPD_NAME		 "OpenSMTPD"
 #endif
-#define	SMTPD_VERSION		 "5.9.2p1"
+#define	SMTPD_VERSION		 "6.0.2p1"
 #define SMTPD_SESSION_TIMEOUT	 300
 #define SMTPD_BACKLOG		 5
 
@@ -232,6 +232,10 @@ enum imsg_type {
 
 	IMSG_CTL_SMTP_SESSION,
 
+	IMSG_SETUP_KEY,
+	IMSG_SETUP_PEER,
+	IMSG_SETUP_DONE,
+
 	IMSG_CONF_START,
 	IMSG_CONF_END,
 
@@ -332,11 +336,6 @@ enum imsg_type {
 
 	IMSG_CA_PRIVENC,
 	IMSG_CA_PRIVDEC
-};
-
-enum blockmodes {
-	BM_NORMAL,
-	BM_NONBLOCK
 };
 
 enum smtp_proc_type {
@@ -1156,7 +1155,7 @@ void bounce_fd(int);
 
 
 /* ca.c */
-pid_t	 ca(void);
+int	 ca(void);
 int	 ca_X509_verify(void *, void *, const char *, const char *, const char **);
 void	 ca_imsg(struct mproc *, struct imsg *);
 void	 ca_init(void);
@@ -1177,14 +1176,13 @@ int	uncompress_file(FILE *, FILE *);
 #define PURGE_PKI_KEYS		0x10
 #define PURGE_EVERYTHING	0x0f
 void purge_config(uint8_t);
-void init_pipes(void);
 void config_process(enum smtp_proc_type);
 void config_peer(enum smtp_proc_type);
 void config_done(void);
 
 
 /* control.c */
-pid_t control(void);
+int control(void);
 int control_create_socket(void);
 
 
@@ -1259,7 +1257,7 @@ int limit_mta_set(struct mta_limits *, const char*, int64_t);
 
 
 /* lka.c */
-pid_t lka(void);
+int lka(void);
 
 
 /* lka_session.c */
@@ -1364,7 +1362,7 @@ int cmdline_symset(char *);
 
 
 /* queue.c */
-pid_t queue(void);
+int queue(void);
 void queue_flow_control(void);
 
 
@@ -1393,7 +1391,7 @@ struct rule *ruleset_match(const struct envelope *);
 
 
 /* scheduler.c */
-pid_t scheduler(void);
+int scheduler(void);
 
 
 /* scheduler_bakend.c */
@@ -1402,7 +1400,7 @@ void scheduler_info(struct scheduler_info *, struct envelope *);
 
 
 /* pony.c */
-pid_t pony(void);
+int pony(void);
 void pony_imsg(struct mproc *, struct imsg *);
 
 
@@ -1424,7 +1422,6 @@ void smtp_filter_fd(uint64_t, int);
 
 /* smtpd.c */
 void imsg_dispatch(struct mproc *, struct imsg *);
-void post_fork(int);
 const char *proc_name(enum smtp_proc_type);
 const char *proc_title(enum smtp_proc_type);
 const char *imsg_to_str(int);
@@ -1532,8 +1529,6 @@ void iobuf_xinit(struct iobuf *, size_t, size_t, const char *);
 void iobuf_xfqueue(struct iobuf *, const char *, const char *, ...);
 void log_envelope(const struct envelope *, const char *, const char *,
     const char *);
-void session_socket_blockmode(int, enum blockmodes);
-void session_socket_no_linger(int);
 int session_socket_error(int);
 int getmailname(char *, size_t);
 int base64_encode(unsigned char const *, size_t, char *, size_t);

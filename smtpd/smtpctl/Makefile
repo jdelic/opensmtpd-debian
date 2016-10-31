@@ -1,8 +1,6 @@
-#	$OpenBSD: Makefile,v 1.43 2015/12/28 13:26:44 benno Exp $
+#	$OpenBSD: Makefile,v 1.44 2016/03/30 06:38:46 jmc Exp $
 
 .PATH:		${.CURDIR}/..
-
-OPENBSD_VERSION!=	uname -r
 
 PROG=	smtpctl
 BINOWN=	root
@@ -12,7 +10,6 @@ BINMODE?=2555
 
 BINDIR=	/usr/sbin
 MAN=	smtpctl.8 aliases.5 forward.5 makemap.8 newaliases.8
-MLINKS=	smtpctl.8 mailq.8
 
 CFLAGS+=	-fstack-protector-all
 CFLAGS+=	-I${.CURDIR}/..
@@ -22,9 +19,6 @@ CFLAGS+=	-Wshadow -Wpointer-arith -Wcast-qual
 CFLAGS+=	-Wsign-compare
 CFLAGS+=	-Werror-implicit-function-declaration
 CFLAGS+=	-DNO_IO
-.if ${OPENBSD_VERSION} == "5.7" || ${OPENBSD_VERSION} == "5.8"
-CFLAGS+=	-D"pledge(promises, paths)=0"
-.endif
 
 SRCS=	enqueue.c
 SRCS+=	parser.c

@@ -319,6 +319,19 @@ AC_CHECK_MEMBERS([struct sockaddr_storage.__ss_family], [], [], [
 #include <sys/socket.h>
 ])
 
+AC_CHECK_MEMBERS(
+  [struct tm.tm_gmtoff, struct tm.tm_zone], 
+  [], 
+  [
+    AC_CHECK_DECLS([timezone, altzone, tzname], 
+      [], 
+      [ AC_MSG_ERROR([cannot find timezone])], 
+      [ #include <time.h> ]
+    )
+  ], 
+  [ #include <time.h> ]
+)
+
 
 #
 # CHECKS FOR DECLARATIONS
@@ -346,7 +359,6 @@ AC_CHECK_DECLS([writev], [], [], [
 #include <sys/uio.h>
 #include <unistd.h>
 ])
-
 
 
 #
@@ -436,10 +448,6 @@ AC_SEARCH_LIBS([crypt],
 
 
 AC_CHECK_FUNCS([ \
-	arc4random \
-	arc4random_buf \
-	arc4random_stir \
-	arc4random_uniform \
 	asprintf \
 	b64_ntop \
 	__b64_ntop \
@@ -454,6 +462,7 @@ AC_CHECK_FUNCS([ \
 	explicit_bzero \
 	fchflags \
 	fgetln \
+	flock \
 	freeaddrinfo \
 	getaddrinfo \
 	getnameinfo \
@@ -970,6 +979,8 @@ AC_ARG_WITH([auth-pam],
 AC_DEFINE_UNQUOTED([USE_PAM_SERVICE], ["$USE_PAM_SERVICE"], [pam service])
 AC_SUBST([USE_PAM_SERVICE])
 
+AC_CHECK_FUNCS([arc4random arc4random_buf arc4random_stir arc4random_uniform])
+
 # Check for older PAM
 if test "x$PAM_MSG" = "xyes" ; then
 	# Check PAM strerror arguments (old PAM)
@@ -1184,6 +1195,14 @@ AC_DEFINE_UNQUOTED([SMTPD_SOCKDIR], ["$sockdir"],
 	[Specify location of smtpd.sock])
 AC_SUBST([sockdir])
 #l4470
+
+# Where to place smtpd.pid
+AC_ARG_WITH([path-pidfile],
+	[  --with-path-pidfile=PATH	Specify path to smtpd.pid directory (default=/var/run)],
+	[AS_IF([test "x$with_path-pidfile" != "xno" -a "x$with_path-pidfile" != "xyes"],
+		AC_DEFINE_UNQUOTED([_PATH_VARRUN], ["$with_path-pidfile"], ["path to pidfile directory"])
+       )]
+)
 
 CA_FILE=/etc/ssl/cert.pem
 AC_ARG_WITH([path-CAfile],
@@ -1775,6 +1794,7 @@ AC_RUN_IFELSE(
 #include <stdlib.h>
 #include <string.h>
 #include <openssl/opensslv.h>
+#include <openssl/crypto.h>
 	]], [[
 	exit(SSLeay() == OPENSSL_VERSION_NUMBER ? 0 : 1);
 	]])],

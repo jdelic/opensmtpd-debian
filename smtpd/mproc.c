@@ -1,4 +1,4 @@
-/*	$OpenBSD: mproc.c,v 1.18 2016/02/10 15:03:37 millert Exp $	*/
+/*	$OpenBSD: mproc.c,v 1.20 2016/06/06 20:48:15 eric Exp $	*/
 
 /*
  * Copyright (c) 2012 Eric Faurot <eric@faurot.net>
@@ -54,8 +54,8 @@ mproc_fork(struct mproc *p, const char *path, char *argv[])
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, sp) < 0)
 		return (-1);
 
-	session_socket_blockmode(sp[0], BM_NONBLOCK);
-	session_socket_blockmode(sp[1], BM_NONBLOCK);
+	io_set_nonblocking(sp[0]);
+	io_set_nonblocking(sp[1]);
 
 	if ((p->pid = fork()) == -1)
 		goto err;
@@ -161,7 +161,7 @@ mproc_dispatch(int fd, short event, void *arg)
 		switch (n) {
 		case -1:
 			if (errno == EAGAIN)
-				return;
+				break;
 			log_warn("warn: %s -> %s: imsg_read",
 			    proc_name(smtpd_process),  p->name);
 			fatal("exiting");
