@@ -1,3 +1,24 @@
+opensmtpd (6.0.2p1-1) unstable; urgency=medium
+
+  * A bug in the smtp session logic can lead to hanging sessions. 
+  * A bug in portable OpenSMTPD can lead to a server crash if PAM
+    support is disabled and an attacker send a mail to an account
+    that has been disabled by setting password to a value that is
+    causing the crypt() call to fail.
+  * A bug in the smtp session logic can lead to a server crash.
+  * new fork+reexec model so each process has its own randomized memory
+    space
+  * logging format has been reworked
+  * a "multi-line response" bug in the LMTP delivery backend has been fixed
+  * connections concurrency limits have been bumped
+  * artificial delaying in remote sessions have been reduced
+  * dhparams option has been removed
+  * dhe option has been added, supporting auto and legacy modes
+  * smtp engine has been simplified
+  * various cosmetic changes, code cleanup and documentation improvement
+
+ -- Jonas Maurus <debian@maurus.net>  Mon, 31 Oct 2016 23:30:00 +0100
+
 opensmtpd (5.9.2p1-1) unstable; urgency=medium
 
   * New upstream release
