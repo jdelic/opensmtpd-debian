@@ -1,5 +1,9 @@
-opensmtpd (6.0.2p1-1) unstable; urgency=medium
+opensmtpd (6.0.2p1-1~mn1) unstable; urgency=medium
 
+  This is a experimental build from upstream release 6.0.2p1 via
+  https://github.com/jdelic/opensmtpd/tree/debian/update-6.0.2.
+
+  Upstream changelog:
   * A bug in the smtp session logic can lead to hanging sessions. 
   * A bug in portable OpenSMTPD can lead to a server crash if PAM
     support is disabled and an attacker send a mail to an account
