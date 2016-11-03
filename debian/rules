@@ -1,0 +1,29 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --with autoreconf
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+	    --with-auth-pam \
+	    --with-group-queue=opensmtpq \
+	    --with-mantype=man \
+	    --with-path-CAfile=/etc/ssl/certs/ca-certificates.crt \
+	    --with-path-empty=/var/lib/opensmtpd/empty \
+	    --with-path-mbox=/var/mail \
+	    --with-table-db \
+	    --with-user-queue=opensmtpq \
+	    --with-user-smtpd=opensmtpd
+
+override_dh_fixperms:
+	dh_fixperms
+	chmod 711 debian/opensmtpd/var/spool/smtpd
+	# OpenSMTPD needs the offline mail queue (for messages sent locally,
+	# e.g., via /usr/sbin/sendmail) to be 1770
+	chmod 1770 debian/opensmtpd/var/spool/smtpd/offline
+	# OpenSMTPD requires the purge directory to be 700
+	chmod 1700 debian/opensmtpd/var/spool/smtpd/purge
+
+override_dh_auto_install:
+	dh_auto_install
+	rmdir debian/opensmtpd/usr/bin

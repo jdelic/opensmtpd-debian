@@ -1,0 +1,19 @@
+Description: Add the missing automake options
+ * foreign : don't complain about missing NEWS/README/AUTHORS/etc files
+ * subdir-objects
+Author: Ryan Kavanagh <rak@debian.org>
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+Index: opensmtpd/configure.ac
+===================================================================
+--- opensmtpd.orig/configure.ac	2016-06-09 19:41:13.212586229 -0400
++++ opensmtpd/configure.ac	2016-06-09 19:41:31.572723734 -0400
+@@ -41,7 +41,7 @@
+ 	[opensmtpd],
+ 	[https://github.com/OpenSMTPD/OpenSMTPD])
+ 
+-AM_INIT_AUTOMAKE([subdir-objects no-dependencies])
++AM_INIT_AUTOMAKE([foreign subdir-objects no-dependencies])
+ LT_INIT
+ 
+ # here we should test for variables set by libtool detection

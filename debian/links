@@ -1,0 +1,3 @@
+usr/sbin/smtpctl usr/sbin/sendmail
+usr/sbin/smtpctl usr/sbin/makemap
+usr/sbin/smtpctl usr/sbin/newaliases

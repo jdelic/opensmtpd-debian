@@ -1,0 +1,507 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: opensmtpd
+Source: http://www.opensmtpd.org/
+
+Files: *
+Copyright: Copyright (C) 2006-2015 Gilles Chehade <gilles@poolp.org>,<gilles@openbsd.org>
+           Copyright (C) 2011-2014 Eric Faurot <eric@faurot.net>,<eric@openbsd.org>
+           Copyright (C) 2012      Charles Longeau <chl@openbsd.org>
+           Copyright (C) 1996      David Mazieres <dm@uun.org>
+           Copyright (C) 1999-2008 Damien Miller <djm@openbsd.org>
+           Copyright (C) 2000-2013 Markus Friedl <markus@openbsd.org>
+           Copyright (C) 2001      Daniel Hartmeier
+           Copyright (C) 2001      Theo de Raadt
+           Copyright (C) 2002-2005 Henning Brauer <henning@openbsd.org>,<henning@bulabula.org>
+           Copyright (C) 2003      Peter Stuge <stuge-mdoc2man@cdy.org>
+           Copyright (C) 2004-2005 Esben Norby <norby@openbsd.org>
+           Copyright (C) 2005      Claudio Jeker <claudio@openbsd.org>
+           Copyright (C) 2006-2008 Pierre-Yves Ritschard <pyr@openbsd.org>
+           Copyright (C) 2006,2014 Reyk Floeter <reyk@openbsd.org>
+           Copyright (C) 2008      Janne Johansson <jj@openbsd.org>
+           Copyright (C) 2008-2009 Jacek Masiulaniec <jacekm@dobremiasto.net>,<jacekm@openbsd.org>
+           Copyright (C) 2013      Ashish Shukla <ashish.is@lostca.se>
+           Copyright (C) 2013      Ryan Kavanagh <rak@debian.org>
+           Copyright (C) 2013,2015 Sunil Nimmagadda <sunil@sunilnimmagadda.com>
+License: ISC
+
+
+Files: debian/*
+Copyright: Copyright (C) 2013-2016 Ryan Kavanagh <rak@debian.org>
+           Copyright (C) 2013      Daniel Walrond <debian@djw.org.uk>
+           Copyright (C) 2013      Justin B Rye <justin.byam.rye@gmail.com>
+           Copyright (C) 2013      Jason Barbier <jabarb@serversave.us>
+License: ISC
+
+Files: debian/po/*
+Copyright: Copyright (C) 2013 Ryan Kavanagh <rak@debian.org>
+           Copyright (C) 2013 Justin B Rye <justin.byam.rye@gmail.com>
+           Copyright (C) 2013 Joe Hansen <joedalton2@yahoo.dk>
+           Copyright (C) 2013 Michal Simunek <michal.simunek@gmail.com>
+           Copyright (C) 2013 Beatrice Torracca <beatricet@libero.it>
+           Copyright (C) 2013 victory <victory.deb@gmail.com>
+           Copyright (C) 2013 Yuri Kozlov <yuray@komyakino.ru>
+           Copyright (C) 2013 Debian l10n French team <debian-l10n-french@lists.debian.org>
+           Copyright (C) 2013 Jean-Pierre Giraud (jipege) <jean-pierregiraud@neuf.fr>
+           Copyright (C) 2013 Martin Bagge <brother@bsnet.se>
+           Copyright (C) 2013 Software in the Public Interest
+           Copyright (C) 2013 Américo Monteiro <a_monteiro@gmx.com>
+           Copyright (C) 2013 Chris Leick <c.leick@vollbio.de>
+           Copyright (C) 2014 Frans Spiesschaert <Frans.Spiesschaert@yucom.be>
+           Copyright (C) 2016 Adriano Rafael Gomes <adrianorg@arg.eti.br>
+License: ISC
+
+
+Files: smtpd/libressl.c
+Copyright: Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
+License: BSD-4-clause and additional-restrictions
+ All rights reserved.
+ .
+ This package is an SSL implementation written
+ by Eric Young (eay@cryptsoft.com).
+ The implementation was written so as to conform with Netscapes SSL.
+ .
+ This library is free for commercial and non-commercial use as long as
+ the following conditions are aheared to.  The following conditions
+ apply to all code found in this distribution, be it the RC4, RSA,
+ lhash, DES, etc., code; not just the SSL code.  The SSL documentation
+ included with this distribution is covered by the same copyright terms
+ except that the holder is Tim Hudson (tjh@cryptsoft.com).
+ .
+ Copyright remains Eric Young's, and as such any Copyright notices in
+ the code are not to be removed.
+ If this package is used in a product, Eric Young should be given attribution
+ as the author of the parts of the library used.
+ This can be in the form of a textual message at program startup or
+ in documentation (online or textual) provided with the package.
+ .
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+ 1. Redistributions of source code must retain the copyright
+    notice, this list of conditions and the following disclaimer.
+ 2. Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+ 3. All advertising materials mentioning features or use of this software
+    must display the following acknowledgement:
+    "This product includes cryptographic software written by
+     Eric Young (eay@cryptsoft.com)"
+    The word 'cryptographic' can be left out if the rouines from the library
+    being used are not cryptographic related :-).
+ 4. If you include any Windows specific code (or a derivative thereof) from
+    the apps directory (application code) you must include an acknowledgement:
+    "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
+ .
+ THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ SUCH DAMAGE.
+ .
+ The licence and distribution terms for any publically available version or
+ derivative of this code cannot be changed.  i.e. this code cannot simply be
+ copied and put under another distribution licence
+ [including the GNU Public Licence.]
+ .
+ SSL operations needed when running in a privilege separated environment.
+ Adapted from openssl's ssl_rsa.c by Pierre-Yves Ritschard .
+
+
+Files: contrib/libexec/mail.local/*
+Copyright: Copyright (C) 1990      The Regents of the University of California.
+	   Copyright (C) 1996-1998 David Mazieres <dm@lcs.mit.edu>
+	   Copyright (C) 1996-1998 Theo de Raadt <deraadt@theos.com>
+License: BSD-3-clause
+
+
+Files: openbsd-compat/*
+Copyright: Copyright (C) 1996            Internet Software Consortium.
+	   Copyright (C) 1997-1998, 2000, 2002,
+                         2004-2005       Todd C. Miller <Todd.Miller@courtesan.com>
+	   Copyright (C) 1999-2004       Damien Miller <djm@mindrot.org>
+	   Copyright (C) 2003-2004       Henning Brauer <henning@openbsd.org>
+	   Copyright (C) 2006-2007       Pierre-Yves Ritschard <pyr@openbsd.org>
+	   Copyright (C) 2006-2008       Reyk Floeter <reyk@openbsd.org>
+	   Copyright (C) 2004            Ted Unangst
+           Copyright (c) 2008            Otto Moerbeek <otto@drijf.net>
+	   Copyright (C) 2012            Charles Longeau <chl@openbsd.org>
+           Copyright (C) 2012            Eric Faurot <eric@openbsd.org>
+           Copyright (c) 2015		 Joerg Jung <jung@openbsd.org>
+           Copyright (c) 2012, 2016      Gilles Chehade <gilles@poolp.org>
+Comment: Most of the OpenBSD compatibility layer is based on the work by
+ Damien Miller for Portable OpenSSH.
+License: ISC
+
+Files: openbsd-compat/base64.c
+Copyright: Copyright (C) 1995 by International Business Machines, Inc.
+License: ISC and permissive
+ In addition to the ISC license applying to openbsd-compat/*, portions of the
+ file are also distributed under the following license:
+ Copyright (C) 1995 by International Business Machines, Inc.
+ .
+ International Business Machines, Inc. (hereinafter called IBM) grants
+ permission under its copyrights to use, copy, modify, and distribute this
+ Software with or without fee, provided that the above copyright notice and
+ all paragraphs of this notice appear in all copies, and that the name of IBM
+ not be used in connection with the marketing of any product incorporating
+ the Software or modifications thereof, without specific, written prior
+ permission.
+ .
+ To the extent it has a right to do so, IBM grants an immunity from suit
+ under its patents, if any, for the use, sale or manufacture of products to
+ the extent that such products are used for performing Domain Name System
+ dynamic updates in TCP/IP networks by means of the Software.  No immunity is
+ granted for any product per se or for any other function of any product.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", AND IBM DISCLAIMS ALL WARRANTIES,
+ INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ PARTICULAR PURPOSE.  IN NO EVENT SHALL IBM BE LIABLE FOR ANY SPECIAL,
+ DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER ARISING
+ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE, EVEN
+ IF IBM IS APPRISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+Files: openbsd-compat/bsd-waitpid.*
+       openbsd-compat/fgetln.c
+       openbsd-compat/openbsd-compat.h
+       openbsd-compat/sys/tree.h
+       openbsd-compat/pidfile.c
+Copyright: Copyright (C) 2000, 2003 Ben Lindstrom
+           Copyright (c) 1999       The NetBSD Foundation, Inc.
+	   Copyright (C) 1999-2003  Damien Miller
+	   Copyright (C) 2002       Tim Rice
+	   Copyright (C) 2002       Niels Provos <provos@citi.umich.edu>
+License: BSD-2-clause
+
+Files: openbsd-compat/daemon.c
+       openbsd-compat/fmt_scaled.c
+       openbsd-compat/getopt.c
+       openbsd-compat/setproctitle.c
+       openbsd-compat/strmode.c
+       openbsd-compat/strsep.c
+       openbsd-compat/sys/queue.h
+       openbsd-compat/vis.*
+Copyright: Copyright (C) 1983, 1987-1994 The Regents of the University of California.
+	   Copyright (C) 2001-2003       Ian F. Darwin
+	   Copyright (C) 1983, 1995-1997 Eric P. Allman
+	   Copyright (C) 2003            Damien Miller
+License: BSD-3-clause
+
+Files: openbsd-compat/fparseln.c
+Copyright: Copyright (C) 1997 Christos Zoulas
+License: BSD-3-clause and additional-restrictions
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+ 1. Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+ 2. Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+ 3. All advertising materials mentioning features or use of this software
+    must display the following acknowledgement:
+      This product includes software developed by Christos Zoulas.
+ 4. The name of the author may not be used to endorse or promote products
+    derived from this software without specific prior written permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Files: openbsd-compat/includes.h
+       openbsd-compat/setresguid.c
+       openbsd-compat/xmalloc.c
+Copyright: Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
+License: permissive
+ All rights reserved
+ .
+ As far as I am concerned, the code I have written for this software
+ can be used freely for any purpose.  Any derived versions of this
+ software must be clearly marked as such, and if the derived work is
+ incompatible with the protocol description in the RFC file, it must be
+ called by a name other than "ssh" or "Secure Shell".
+
+Files: openbsd-compat/libressl.c
+Copyright: Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
+License: BSD-4-clause and additional-restrictions
+ All rights reserved.
+ .
+ This package is an SSL implementation written
+ by Eric Young (eay@cryptsoft.com).
+ The implementation was written so as to conform with Netscapes SSL.
+ .
+ This library is free for commercial and non-commercial use as long as
+ the following conditions are aheared to.  The following conditions
+ apply to all code found in this distribution, be it the RC4, RSA,
+ lhash, DES, etc., code; not just the SSL code.  The SSL documentation
+ included with this distribution is covered by the same copyright terms
+ except that the holder is Tim Hudson (tjh@cryptsoft.com).
+ .
+ Copyright remains Eric Young's, and as such any Copyright notices in
+ the code are not to be removed.
+ If this package is used in a product, Eric Young should be given attribution
+ as the author of the parts of the library used.
+ This can be in the form of a textual message at program startup or
+ in documentation (online or textual) provided with the package.
+ .
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+ 1. Redistributions of source code must retain the copyright
+    notice, this list of conditions and the following disclaimer.
+ 2. Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+ 3. All advertising materials mentioning features or use of this software
+    must display the following acknowledgement:
+    "This product includes cryptographic software written by
+     Eric Young (eay@cryptsoft.com)"
+    The word 'cryptographic' can be left out if the rouines from the library
+    being used are not cryptographic related :-).
+ 4. If you include any Windows specific code (or a derivative thereof) from
+    the apps directory (application code) you must include an acknowledgement:
+    "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
+ .
+ THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ SUCH DAMAGE.
+ .
+ The licence and distribution terms for any publically available version or
+ derivative of this code cannot be changed.  i.e. this code cannot simply be
+ copied and put under another distribution licence
+ [including the GNU Public Licence.]
+
+
+Files:
+       Makefile.in
+       aclocal.m4
+       contrib/Makefile.in
+       contrib/libexec/Makefile.in
+       contrib/libexec/encrypt/Makefile.in
+       contrib/libexec/mail.local/Makefile.in
+       mk/Makefile.in
+       mk/smtpctl/Makefile.in
+       mk/smtpd/Makefile.in
+       openbsd-compat/Makefile.in
+Copyright: Copyright (c) 1996-2014 Free Software foundation, Inc.
+License: permissive-
+ This file is free software; the Free Software Foundation
+ gives unlimited permission to copy and/or distribute it,
+ with or without modifications, as long as this notice is preserved.
+ .
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY, to the extent permitted by law; without
+ even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+ PARTICULAR PURPOSE.
+
+Files:
+       m4/libtool.m4
+       m4/ltoptions.m4
+       m4/ltsugar.m4
+       m4/ltversion.m4
+       m4/lt~obsolete.m4
+Copyright: Copyright (c) 1996-2009 Free Software foundation, Inc.
+License: permissive
+ This file is free software; the Free Software Foundation
+ gives unlimited permission to copy and/or distribute it,
+ with or without modifications, as long as this notice is preserved.
+
+Files: configure
+Copyright: Copyright (C) 1992-2012 Free Software Foundation, Inc.
+License: permissive and GPL-2+ with Autoconf exception
+ This configure script is free software; the Free Software Foundation
+ gives unlimited permission to copy, distribute and modify it.
+ .
+ GNU Libtool is free software; you can redistribute it and/or
+ modify it under the terms of the GNU General Public License as
+ published by the Free Software Foundation; either version 2 of
+ the License, or (at your option) any later version.
+ .
+ As a special exception to the GNU General Public License,
+ if you distribute this file as part of a program or library that
+ is built using GNU Libtool, you may include this file under the
+ same distribution terms that you use for the rest of that program.
+ .
+ GNU Libtool is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ .
+ You should have received a copy of the GNU General Public License
+ along with GNU Libtool; see the file COPYING.  If not, a copy
+ can be downloaded from http://www.gnu.org/licenses/gpl.html, or
+ obtained by writing to the Free Software Foundation, Inc.,
+ 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ .
+ On Debian systems, the full text of the GNU General Public License
+ version 2 can be found in the file `/usr/share/common-licenses/GPL-2'.
+
+Files: config.guess
+       config.sub
+Copyright: Copyright (c) 1996-2014 Free Software foundation, Inc.
+License: GPL-3+ with Autoconf exception
+ This file is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 3 of the License, or
+ (at your option) any later version.
+ .
+ This program is distributed in the hope that it will be useful, but
+ WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ General Public License for more details.
+ .
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, see <http://www.gnu.org/licenses/>.
+ .
+ As a special exception to the GNU General Public License, if you
+ distribute this file as part of a program that contains a
+ configuration script generated by Autoconf, you may include it under
+ the same distribution terms that you use for the rest of that
+ program.  This Exception is an additional permission under section 7
+ of the GNU General Public License, version 3 ("GPLv3").
+ .
+ On Debian systems, the full text of the GNU General Public License
+ version 3 can be found in the file `/usr/share/common-licenses/GPL-3'.
+
+Files: missing
+       ylwrap
+Copyright: Copyright (C) 1996-2014 Free Software Foundation, Inc.
+License: GPL-2+ with Autoconf exception
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2, or (at your option)
+ any later version.
+ .
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ .
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ .
+ As a special exception to the GNU General Public License, if you
+ distribute this file as part of a program that contains a
+ configuration script generated by Autoconf, you may include it under
+ the same distribution terms that you use for the rest of that program.
+
+Files: install-sh
+Copyright: Copyright (C) 1994 X Consortium
+License: Expat and additional-restrictions and public-domain
+ Permission is hereby granted, free of charge, to any person obtaining a
+ copy of this software and associated documentation files (the
+ "Software"), to deal in the Software without restriction, including
+ without limitation the rights to use, copy, modify, merge, publish,
+ distribute, sublicense, and/or sell copies of the Software, and to
+ permit persons to whom the Software is furnished to do so, subject to
+ the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included
+ in all copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ IN NO EVENT SHALL THE X CONSORTIUM BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ OTHER DEALINGS IN THE SOFTWARE.
+ .
+ Except as contained in this notice, the name of the X Consortium shall
+ not be used in advertising or otherwise to promote the sale, use or
+ other dealings in this Software without prior written authorization
+ from the X Consortium.
+ .
+ FSF changes to this file are in the public domain.
+ .
+ Calling this script install-sh is preferred over install.sh, to
+ prevent 'make' implicit rules from creating a file called install from
+ it when there is no Makefile.
+ .
+ This script is compatible with the BSD install script, but was written
+ from scratch.
+
+Files: configure.ac
+Copyright: Copyright (C) 1999-2004 Damien Miller
+           Copyright (c) 2016 Gilles Chehade <gilles@poolp.org>
+License: ISC
+
+
+License: ISC
+ Permission to use, copy, modify, and distribute this software for any
+ purpose with or without fee is hereby granted, provided that the above
+ copyright notice and this permission notice appear in all copies.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+License: BSD-2-clause
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+ 1. Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+ 2. Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+License: BSD-3-clause
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+ 1. Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+ 2. Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+ 3. Neither the name of the University nor the names of its contributors
+    may be used to endorse or promote products derived from this software
+    without specific prior written permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ SUCH DAMAGE.
